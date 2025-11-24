@@ -1,0 +1,78 @@
+<%- include('partials/header', {
+  title: 'Checkout - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/cart', label: 'Back to Cart' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<div class="container my-4">
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h4 class="card-title mb-3">Payment & Delivery</h4>
+          <form>
+            <div class="mb-3">
+              <label class="form-label" for="fullName">Full Name</label>
+              <input type="text" id="fullName" class="form-control" placeholder="John Doe">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="address">Delivery Address</label>
+              <textarea id="address" class="form-control" rows="3" placeholder="123 Main St, City, Country"></textarea>
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label" for="cardNumber">Card Number</label>
+                <input type="text" id="cardNumber" class="form-control" placeholder="1234 5678 9012 3456">
+              </div>
+              <div class="col-md-3 mb-3">
+                <label class="form-label" for="expiry">Expiry</label>
+                <input type="text" id="expiry" class="form-control" placeholder="MM/YY">
+              </div>
+              <div class="col-md-3 mb-3">
+                <label class="form-label" for="cvv">CVV</label>
+                <input type="text" id="cvv" class="form-control" placeholder="123">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="contact">Contact Number</label>
+              <input type="text" id="contact" class="form-control" placeholder="+1 234 567 8900">
+            </div>
+            <button type="button" class="btn btn-primary w-100">Pay Now</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h4 class="card-title mb-3">Order Summary</h4>
+          <% if (!cart || cart.length === 0) { %>
+            <p class="text-muted">Your cart is empty.</p>
+          <% } else { %>
+            <ul class="list-group list-group-flush mb-3">
+              <% cart.forEach(function(item){ %>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <div class="fw-bold"><%= item.productName %></div>
+                    <small class="text-muted">Qty: <%= item.quantity %> @ $<%= item.unitPrice.toFixed(2) %></small>
+                  </div>
+                  <span>$<%= item.lineTotal.toFixed(2) %></span>
+                </li>
+              <% }); %>
+            </ul>
+            <div class="d-flex justify-content-between align-items-center">
+              <strong>Total</strong>
+              <strong>$<%= cartTotal.toFixed(2) %></strong>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

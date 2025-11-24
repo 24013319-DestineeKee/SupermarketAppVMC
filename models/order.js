@@ -1,0 +1,176 @@
+const db = require('../db');
+
+const OrderModel = {
+  getAllOrders(callback) {
+    const orderSql = 'SELECT id, userId, totalAmount, status FROM orders';
+    db.query(orderSql, (orderErr, orders) => {
+      if (orderErr) return callback(orderErr);
+      if (!orders.length) return callback(null, []);
+
+      const orderIds = orders.map((o) => o.id);
+      const itemsSql = 'SELECT id, orderId, productId, quantity, price FROM order_items WHERE orderId IN (?)';
+      db.query(itemsSql, [orderIds], (itemsErr, items) => {
+        if (itemsErr) return callback(itemsErr);
+
+        const itemsByOrder = {};
+        items.forEach((item) => {
+          if (!itemsByOrder[item.orderId]) itemsByOrder[item.orderId] = [];
+          itemsByOrder[item.orderId].push(item);
+        });
+
+        const hydrated = orders.map((order) => ({
+          ...order,
+          items: itemsByOrder[order.id] || []
+        }));
+        callback(null, hydrated);
+      });
+    });
+  },
+
+  getOrderById(id, callback) {
+    const orderSql = 'SELECT id, userId, totalAmount, status FROM orders WHERE id = ?';
+    db.query(orderSql, [id], (orderErr, orderResults) => {
+      if (orderErr) return callback(orderErr);
+      const order = orderResults[0];
+      if (!order) return callback(null, null);
+
+      const itemsSql = 'SELECT id, orderId, productId, quantity, price FROM order_items WHERE orderId = ?';
+      db.query(itemsSql, [id], (itemsErr, items) => {
+        if (itemsErr) return callback(itemsErr);
+        callback(null, { ...order, items: items || [] });
+      });
+    });
+  },
+
+  createOrder(orderData, items, callback) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return callback(new Error('Order items are required'));
+    }
+
+    db.beginTransaction((txErr) => {
+      if (txErr) return callback(txErr);
+
+      const insertOrderSql = 'INSERT INTO orders (userId, totalAmount, status) VALUES (?, ?, ?)';
+      const orderParams = [
+        orderData.userId,
+        orderData.totalAmount,
+        orderData.status || 'pending'
+      ];
+
+      db.query(insertOrderSql, orderParams, (orderErr, orderResult) => {
+        if (orderErr) return db.rollback(() => callback(orderErr));
+
+        const orderId = orderResult.insertId;
+        const itemValues = items.map((item) => [
+          orderId,
+          item.productId,
+          item.quantity,
+          item.price
+        ]);
+
+        const insertItemsSql = 'INSERT INTO order_items (orderId, productId, quantity, price) VALUES ?';
+        db.query(insertItemsSql, [itemValues], (itemsErr) => {
+          if (itemsErr) return db.rollback(() => callback(itemsErr));
+
+          db.commit((commitErr) => {
+            if (commitErr) return db.rollback(() => callback(commitErr));
+            callback(null, { orderId });
+          });
+        });
+      });
+    });
+  },
+
+  updateOrder(id, orderData, items, callback) {
+    this.getOrderById(id, (findErr, existing) => {
+      if (findErr) return callback(findErr);
+      if (!existing) return callback(null, null);
+
+      const updatedOrder = {
+        userId: orderData.userId != null ? orderData.userId : existing.userId,
+        totalAmount: orderData.totalAmount != null ? orderData.totalAmount : existing.totalAmount,
+        status: orderData.status != null ? orderData.status : existing.status
+      };
+
+      db.beginTransaction((txErr) => {
+        if (txErr) return callback(txErr);
+
+        const updateSql = 'UPDATE orders SET userId = ?, totalAmount = ?, status = ? WHERE id = ?';
+        const params = [
+          updatedOrder.userId,
+          updatedOrder.totalAmount,
+          updatedOrder.status,
+          id
+        ];
+
+        db.query(updateSql, params, (updateErr) => {
+          if (updateErr) return db.rollback(() => callback(updateErr));
+
+          const hasItems = Array.isArray(items);
+          const replaceItems = hasItems && items.length >= 0;
+
+          if (!replaceItems) {
+            return db.commit((commitErr) => {
+              if (commitErr) return db.rollback(() => callback(commitErr));
+              callback(null, { id });
+            });
+          }
+
+          const deleteSql = 'DELETE FROM order_items WHERE orderId = ?';
+          db.query(deleteSql, [id], (deleteErr) => {
+            if (deleteErr) return db.rollback(() => callback(deleteErr));
+
+            if (items.length === 0) {
+              return db.commit((commitErr) => {
+                if (commitErr) return db.rollback(() => callback(commitErr));
+                callback(null, { id });
+              });
+            }
+
+            const values = items.map((item) => [
+              id,
+              item.productId,
+              item.quantity,
+              item.price
+            ]);
+            const insertSql = 'INSERT INTO order_items (orderId, productId, quantity, price) VALUES ?';
+            db.query(insertSql, [values], (itemsErr) => {
+              if (itemsErr) return db.rollback(() => callback(itemsErr));
+
+              db.commit((commitErr) => {
+                if (commitErr) return db.rollback(() => callback(commitErr));
+                callback(null, { id });
+              });
+            });
+          });
+        });
+      });
+    });
+  },
+
+  deleteOrder(id, callback) {
+    db.beginTransaction((txErr) => {
+      if (txErr) return callback(txErr);
+
+      const deleteItemsSql = 'DELETE FROM order_items WHERE orderId = ?';
+      db.query(deleteItemsSql, [id], (itemsErr) => {
+        if (itemsErr) return db.rollback(() => callback(itemsErr));
+
+        const deleteOrderSql = 'DELETE FROM orders WHERE id = ?';
+        db.query(deleteOrderSql, [id], (orderErr, result) => {
+          if (orderErr) return db.rollback(() => callback(orderErr));
+          if (result.affectedRows === 0) {
+            return db.rollback(() => callback(null, null));
+          }
+
+          db.commit((commitErr) => {
+            if (commitErr) return db.rollback(() => callback(commitErr));
+            callback(null, { id });
+          });
+        });
+      });
+    });
+  }
+};
+
+module.exports = OrderModel;

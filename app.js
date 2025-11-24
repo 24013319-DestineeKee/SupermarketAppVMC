@@ -157,6 +157,7 @@ app.post('/cart/add/:productId', checkAuthenticated, CartController.addItem); //
 app.post('/cart/update/:id', checkAuthenticated, CartController.updateQuantity);
 app.post('/cart/remove/:id', checkAuthenticated, CartController.removeItem);
 app.get('/cart', checkAuthenticated, CartController.viewCart);
+app.get('/checkout', checkAuthenticated, CartController.viewCheckout);
 
 app.get('/product/:id', checkAuthenticated, (req, res) => {
   const productId = parseInt(req.params.id, 10);
