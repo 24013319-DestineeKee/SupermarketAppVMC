@@ -1,0 +1,64 @@
+<%- include('partials/header', {
+  title: 'User Dashboard - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/orders', label: 'Orders' },
+    { href: '/users', label: 'Users' },
+    { href: '/inventory', label: 'Inventory' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">User Dashboard</h2>
+    <a href="/users" class="btn btn-outline-primary btn-sm">Refresh</a>
+  </div>
+
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+  <% if (messages && messages.success && messages.success.length) { %>
+    <div class="alert alert-success">
+      <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+
+  <% if (!users || !users.length) { %>
+    <div class="alert alert-info">No users available.</div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach(function(u){ %>
+            <tr>
+              <td><%= u.id %></td>
+              <td><%= u.username %></td>
+              <td><%= u.email %></td>
+              <td><span class="badge bg-info text-dark text-uppercase"><%= u.role %></span></td>
+              <td class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-secondary" href="/users/<%= u.id %>/edit">Edit</a>
+                <form action="/users/<%= u.id %>/delete" method="POST" onsubmit="return confirm('Delete this user?');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

@@ -1,5 +1,6 @@
 const CartModel = require('../models/cart');
 const ProductModel = require('../models/product');
+const OrderModel = require('../models/order');
 
 const parsePositiveInt = (value) => {
   const n = parseInt(value, 10);
@@ -62,7 +63,92 @@ const CartController = {
       }
 
       const { cart, cartTotal } = mapCartItems(items);
-      res.render('checkout', { cart, cartTotal, user: req.session.user });
+      res.render('checkout', { cart, cartTotal, user: req.session.user, formData: req.flash('formData')[0] });
+    });
+  },
+
+  processCheckout(req, res) {
+    if (!req.session?.user) {
+      req.flash('error', 'Please log in to checkout.');
+      return res.redirect('/login');
+    }
+
+    const { fullName, address, contact, email, cardNumber, expiry, cvv } = req.body;
+    const errors = [];
+
+    if (!fullName) errors.push('Full name is required.');
+    if (!address) errors.push('Delivery address is required.');
+    if (!contact || !/^\+?\d{7,15}$/.test(contact.trim())) errors.push('Contact number must be 7-15 digits (may start with +).');
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) errors.push('A valid email is required (e.g., mary@mary.com).');
+    if (!cardNumber || !/^\d{16}$/.test(cardNumber.trim())) errors.push('Card number must be exactly 16 digits.');
+    if (!cvv || !/^\d{3,4}$/.test(cvv.trim())) errors.push('CVV must be 3-4 digits.');
+    if (!expiry || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry.trim())) {
+      errors.push('Expiry must be in MM/YY format.');
+    } else {
+      const [mm, yy] = expiry.split('/');
+      const month = parseInt(mm, 10);
+      const year = 2000 + parseInt(yy, 10);
+      const now = new Date();
+      const expDate = new Date(year, month);
+      if (expDate <= now) errors.push('Card has expired.');
+    }
+
+    if (errors.length) {
+      req.flash('error', errors);
+      req.flash('formData', req.body);
+      return res.redirect('/checkout');
+    }
+
+    const userId = req.session.user.id;
+    CartModel.getCartByUser(userId, (err, items) => {
+      if (err) {
+        console.error('Error fetching cart:', err);
+        req.flash('error', 'Unable to complete checkout right now.');
+        return res.redirect('/cart');
+      }
+      if (!items || items.length === 0) {
+        req.flash('error', 'Your cart is empty.');
+        return res.redirect('/cart');
+      }
+
+      const { cart, cartTotal } = mapCartItems(items);
+      const orderItems = cart.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        price: item.discountedPrice
+      }));
+
+      const checkoutDetails = {
+        fullName: fullName || req.session.user.username || '',
+        address: address || req.session.user.address || '',
+        contact: contact || req.session.user.contact || '',
+        email: email || req.session.user.email || ''
+      };
+
+      const payload = {
+        userId,
+        totalAmount: cartTotal,
+        status: 'processing'
+      };
+
+      OrderModel.createOrder(payload, orderItems, (orderErr, result) => {
+        if (orderErr) {
+          console.error('Error creating order:', orderErr);
+          req.flash('error', 'Unable to place order.');
+          return res.redirect('/cart');
+        }
+
+        CartModel.clearCartByUser(userId, (clearErr) => {
+          if (clearErr) console.error('Error clearing cart after checkout:', clearErr);
+          res.render('invoice', {
+            orderId: result.orderId,
+            cart,
+            cartTotal,
+            checkout: checkoutDetails,
+            user: req.session.user
+          });
+        });
+      });
     });
   },
 
@@ -100,18 +186,37 @@ const CartController = {
         return res.redirect(backUrl);
       }
 
-      CartModel.addOrUpdateItem(req.session.user.id, productId, quantity, (cartErr, info) => {
-        if (cartErr) {
-          console.error('Error adding to cart:', cartErr);
+      CartModel.getCartItemByProduct(req.session.user.id, productId, (cartItemErr, cartItem) => {
+        if (cartItemErr) {
+          console.error('Error checking cart item:', cartItemErr);
           req.flash('error', 'Unable to add item to cart.');
           return res.redirect(backUrl);
         }
-        if (info && info.missingTable) {
+        if (cartItem && cartItem.missingTable) {
           req.flash('error', 'Cart storage is unavailable. Please ensure the cart_items table exists.');
           return res.redirect(backUrl);
         }
-        req.flash('success', 'Item added to cart.');
-        return res.redirect(backUrl);
+
+        const currentQty = cartItem ? Number(cartItem.quantity) : 0;
+        const desiredTotal = currentQty + quantity;
+        if (desiredTotal > product.quantity) {
+          req.flash('error', `Only ${product.quantity} in stock. Please reduce quantity.`);
+          return res.redirect(backUrl);
+        }
+
+        CartModel.addOrUpdateItem(req.session.user.id, productId, quantity, (cartErr, info) => {
+          if (cartErr) {
+            console.error('Error adding to cart:', cartErr);
+            req.flash('error', 'Unable to add item to cart.');
+            return res.redirect(backUrl);
+          }
+          if (info && info.missingTable) {
+            req.flash('error', 'Cart storage is unavailable. Please ensure the cart_items table exists.');
+            return res.redirect(backUrl);
+          }
+          req.flash('success', 'Item added to cart.');
+          return res.redirect(backUrl);
+        });
       });
     });
   },
@@ -143,18 +248,38 @@ const CartController = {
       return;
     }
 
-    CartModel.updateQuantity(req.session.user.id, itemId, quantity, (err, info) => {
-      if (err) {
-        console.error('Error updating quantity:', err);
+    CartModel.getCartItemWithProduct(req.session.user.id, itemId, (itemErr, cartItem) => {
+      if (itemErr) {
+        console.error('Error loading cart item:', itemErr);
         req.flash('error', 'Unable to update quantity.');
         return res.redirect('/cart');
       }
-      if (info && info.missingTable) {
+      if (cartItem && cartItem.missingTable) {
         req.flash('error', 'Cart storage is unavailable. Please ensure the cart_items table exists.');
         return res.redirect('/cart');
       }
-      req.flash('success', 'Cart updated.');
-      return res.redirect('/cart');
+      if (!cartItem) {
+        req.flash('error', 'Cart item not found.');
+        return res.redirect('/cart');
+      }
+      if (quantity > cartItem.productStock) {
+        req.flash('error', `Only ${cartItem.productStock} in stock. Please reduce quantity.`);
+        return res.redirect('/cart');
+      }
+
+      CartModel.updateQuantity(req.session.user.id, itemId, quantity, (err, info) => {
+        if (err) {
+          console.error('Error updating quantity:', err);
+          req.flash('error', 'Unable to update quantity.');
+          return res.redirect('/cart');
+        }
+        if (info && info.missingTable) {
+          req.flash('error', 'Cart storage is unavailable. Please ensure the cart_items table exists.');
+          return res.redirect('/cart');
+        }
+        req.flash('success', 'Cart updated.');
+        return res.redirect('/cart');
+      });
     });
   },
 

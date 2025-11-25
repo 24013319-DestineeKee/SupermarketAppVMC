@@ -1,0 +1,64 @@
+<%- include('partials/header', {
+  title: 'Invoice - Supermarket App',
+  user,
+  navLinks: user && user.role === 'admin'
+    ? [
+        { href: '/orders', label: 'Orders' },
+        { href: '/users', label: 'Users' },
+        { href: '/inventory', label: 'Inventory' },
+        { href: '/logout', label: 'Logout' }
+      ]
+    : [
+        { href: '/shopping', label: 'Shopping' },
+        { href: '/cart', label: 'Cart' },
+        { href: '/logout', label: 'Logout' }
+      ]
+}) %>
+
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Invoice</h3>
+    <span class="badge bg-success">Order #<%= orderId %></span>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Billing & Delivery</h5>
+          <p class="mb-1"><strong>Name:</strong> <%= checkout.fullName %></p>
+          <p class="mb-1"><strong>Address:</strong><br><%= checkout.address || 'N/A' %></p>
+          <p class="mb-0"><strong>Contact:</strong> <%= checkout.contact || 'N/A' %></p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Order Summary</h5>
+          <ul class="list-group list-group-flush mb-3">
+            <% cart.forEach(function(item){ %>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="fw-bold"><%= item.productName %></div>
+                  <small class="text-muted">Qty: <%= item.quantity %> @ $<%= item.unitPrice.toFixed(2) %></small>
+                </div>
+                <span>$<%= item.lineTotal.toFixed(2) %></span>
+              </li>
+            <% }); %>
+          </ul>
+          <div class="d-flex justify-content-between">
+            <strong>Total</strong>
+            <strong>$<%= cartTotal.toFixed(2) %></strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4 text-end">
+    <a class="btn btn-primary" href="/shopping">Continue Shopping</a>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

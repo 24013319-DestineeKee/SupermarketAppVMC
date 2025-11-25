@@ -6,6 +6,7 @@ const crypto = require('crypto');
 
 const ProductModel = require('./models/product');
 const UserModel = require('./models/user');
+const OrderModel = require('./models/order');
 const ProductController = require('./controllers/ProductController');
 const UserController = require('./controllers/UserController');
 const CartController = require('./controllers/CartController');
@@ -158,6 +159,7 @@ app.post('/cart/update/:id', checkAuthenticated, CartController.updateQuantity);
 app.post('/cart/remove/:id', checkAuthenticated, CartController.removeItem);
 app.get('/cart', checkAuthenticated, CartController.viewCart);
 app.get('/checkout', checkAuthenticated, CartController.viewCheckout);
+app.post('/checkout', checkAuthenticated, CartController.processCheckout);
 
 app.get('/product/:id', checkAuthenticated, (req, res) => {
   const productId = parseInt(req.params.id, 10);
@@ -201,11 +203,190 @@ app.post('/updateProduct/:id', checkAuthenticated, checkAdmin, upload.single('im
   });
 });
 
+// Admin dashboards
+app.get('/orders', checkAuthenticated, checkAdmin, (req, res) => {
+  OrderModel.getAllOrders((err, orders) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to load orders.');
+      return res.render('orderDashboard', { orders: [], user: req.session.user });
+    }
+    res.render('orderDashboard', { orders: orders || [], user: req.session.user });
+  });
+});
+
+app.get('/orders/new', checkAuthenticated, checkAdmin, (req, res) => {
+  res.render('editOrder', { order: null, user: req.session.user });
+});
+
+app.post('/orders/new', checkAuthenticated, checkAdmin, (req, res) => {
+  const { userId, totalAmount, status } = req.body;
+  const orderData = {
+    userId: Number(userId),
+    totalAmount: totalAmount != null ? Number(totalAmount) : 0,
+    status: status || 'pending'
+  };
+  OrderModel.createOrder(orderData, [], (err) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to create order.');
+      return res.redirect('/orders/new');
+    }
+    req.flash('success', 'Order created.');
+    res.redirect('/orders');
+  });
+});
+
+app.get('/users', checkAuthenticated, checkAdmin, (req, res) => {
+  UserModel.getAllUsers((err, users) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to load users.');
+      return res.render('userDashboard', { users: [], user: req.session.user });
+    }
+    res.render('userDashboard', { users: users || [], user: req.session.user });
+  });
+});
+
+app.get('/orders/:id/edit', checkAuthenticated, checkAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    req.flash('error', 'Invalid order id.');
+    return res.redirect('/orders');
+  }
+  OrderModel.getOrderById(id, (err, order) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to load order.');
+      return res.redirect('/orders');
+    }
+    if (!order) {
+      req.flash('error', 'Order not found.');
+      return res.redirect('/orders');
+    }
+    res.render('editOrder', { order, user: req.session.user });
+  });
+});
+
+app.post('/orders/:id/edit', checkAuthenticated, checkAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    req.flash('error', 'Invalid order id.');
+    return res.redirect('/orders');
+  }
+  const { userId, totalAmount, status } = req.body;
+  const orderData = {
+    userId: userId != null ? Number(userId) : undefined,
+    totalAmount: totalAmount != null ? Number(totalAmount) : undefined,
+    status
+  };
+  OrderModel.updateOrder(id, orderData, undefined, (err, result) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to update order.');
+      return res.redirect(`/orders/${id}/edit`);
+    }
+    if (!result) {
+      req.flash('error', 'Order not found.');
+      return res.redirect('/orders');
+    }
+    req.flash('success', 'Order updated.');
+    res.redirect('/orders');
+  });
+});
+
+app.post('/orders/:id/delete', checkAuthenticated, checkAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    req.flash('error', 'Invalid order id.');
+    return res.redirect('/orders');
+  }
+  OrderModel.deleteOrder(id, (err, result) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to delete order.');
+      return res.redirect('/orders');
+    }
+    if (!result) {
+      req.flash('error', 'Order not found.');
+      return res.redirect('/orders');
+    }
+    req.flash('success', 'Order deleted.');
+    res.redirect('/orders');
+  });
+});
+
+app.get('/users/:id/edit', checkAuthenticated, checkAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    req.flash('error', 'Invalid user id.');
+    return res.redirect('/users');
+  }
+  UserModel.getUserById(id, (err, editUser) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to load user.');
+      return res.redirect('/users');
+    }
+    res.render('editUser', { editUser, user: req.session.user });
+  });
+});
+
+app.post('/users/:id/edit', checkAuthenticated, checkAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    req.flash('error', 'Invalid user id.');
+    return res.redirect('/users');
+  }
+  const { username, email, address, contact, role, password } = req.body;
+  UserModel.getUserById(id, (findErr, existing) => {
+    if (findErr || !existing) {
+      if (findErr) console.error('DB error:', findErr);
+      req.flash('error', 'User not found.');
+      return res.redirect('/users');
+    }
+    const updated = {
+      username: username || existing.username,
+      email: email || existing.email,
+      password: password ? crypto.createHash('sha1').update(password).digest('hex') : existing.password,
+      address: address || existing.address,
+      contact: contact || existing.contact,
+      role: role || existing.role
+    };
+    UserModel.updateUser(id, updated, (err) => {
+      if (err) {
+        console.error('DB error:', err);
+        req.flash('error', 'Unable to update user.');
+        return res.redirect(`/users/${id}/edit`);
+      }
+      req.flash('success', 'User updated.');
+      res.redirect('/users');
+    });
+  });
+});
+
 app.get('/deleteProduct/:id', checkAuthenticated, checkAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   ProductModel.deleteProduct(id, (err) => {
     if (err) return res.status(500).send('Error deleting product');
     res.redirect('/inventory');
+  });
+});
+
+app.post('/users/:id/delete', checkAuthenticated, checkAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    req.flash('error', 'Invalid user id.');
+    return res.redirect('/users');
+  }
+  UserModel.deleteUser(id, (err) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to delete user.');
+      return res.redirect('/users');
+    }
+    req.flash('success', 'User deleted.');
+    res.redirect('/users');
   });
 });
 

@@ -1,0 +1,71 @@
+<%- include('partials/header', {
+  title: 'Order Dashboard - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/orders', label: 'Orders' },
+    { href: '/users', label: 'Users' },
+    { href: '/inventory', label: 'Inventory' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Order Dashboard</h2>
+    <div class="d-flex gap-2">
+      <a href="/orders/new" class="btn btn-primary btn-sm">New Order</a>
+      <a href="/orders" class="btn btn-outline-primary btn-sm">Refresh</a>
+    </div>
+  </div>
+
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+  <% if (messages && messages.success && messages.success.length) { %>
+    <div class="alert alert-success">
+      <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+
+  <% if (!orders || !orders.length) { %>
+    <div class="alert alert-info">No orders available.</div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>User ID</th>
+            <th>Status</th>
+            <th>Total</th>
+            <th>Items</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% orders.forEach(function(order){ %>
+            <tr>
+              <td>#<%= order.id %></td>
+              <td><%= order.userId %></td>
+              <td><span class="badge bg-secondary text-uppercase"><%= order.status || 'pending' %></span></td>
+              <td>$<%= (order.totalAmount || 0).toFixed(2) %></td>
+              <td><%= (order.items && order.items.length) ? order.items.length : 0 %></td>
+              <td><%= order.createdAt ? order.createdAt : '-' %></td>
+              <td class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-secondary" href="/orders/<%= order.id %>/edit">Edit</a>
+                <form action="/orders/<%= order.id %>/delete" method="POST" onsubmit="return confirm('Delete this order?');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

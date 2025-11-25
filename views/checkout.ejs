@@ -8,39 +8,51 @@
 }) %>
 
 <div class="container my-4">
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+
   <div class="row g-4">
     <div class="col-lg-7">
       <div class="card shadow-sm">
         <div class="card-body">
           <h4 class="card-title mb-3">Payment & Delivery</h4>
-          <form>
-            <div class="mb-3">
-              <label class="form-label" for="fullName">Full Name</label>
-              <input type="text" id="fullName" class="form-control" placeholder="John Doe">
+          <form action="/checkout" method="POST">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label" for="fullName">Full Name</label>
+                <input type="text" id="fullName" name="fullName" class="form-control" placeholder="Mary Tan" value="<%= (formData && formData.fullName) || (user && user.username) || '' %>">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label" for="email">Email</label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="mary@mary.com" value="<%= (formData && formData.email) || (user && user.email) || '' %>">
+              </div>
             </div>
             <div class="mb-3">
               <label class="form-label" for="address">Delivery Address</label>
-              <textarea id="address" class="form-control" rows="3" placeholder="123 Main St, City, Country"></textarea>
+              <textarea id="address" name="address" class="form-control" rows="3" placeholder="123 Main St, City, Country"><%= (formData && formData.address) || (user && user.address) || '' %></textarea>
             </div>
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label class="form-label" for="cardNumber">Card Number</label>
-                <input type="text" id="cardNumber" class="form-control" placeholder="1234 5678 9012 3456">
+                <input type="text" id="cardNumber" name="cardNumber" class="form-control" placeholder="1234 5678 9012 3456" value="<%= (formData && formData.cardNumber) || '' %>">
               </div>
               <div class="col-md-3 mb-3">
                 <label class="form-label" for="expiry">Expiry</label>
-                <input type="text" id="expiry" class="form-control" placeholder="MM/YY">
+                <input type="text" id="expiry" name="expiry" class="form-control" placeholder="MM/YY" value="<%= (formData && formData.expiry) || '' %>">
               </div>
               <div class="col-md-3 mb-3">
                 <label class="form-label" for="cvv">CVV</label>
-                <input type="text" id="cvv" class="form-control" placeholder="123">
+                <input type="text" id="cvv" name="cvv" class="form-control" placeholder="123" value="<%= (formData && formData.cvv) || '' %>">
               </div>
             </div>
             <div class="mb-3">
               <label class="form-label" for="contact">Contact Number</label>
-              <input type="text" id="contact" class="form-control" placeholder="+1 234 567 8900">
+              <input type="text" id="contact" name="contact" class="form-control" placeholder="+1 234 567 8900" value="<%= (formData && formData.contact) || (user && user.contact) || '' %>">
             </div>
-            <button type="button" class="btn btn-primary w-100">Pay Now</button>
+            <button type="submit" class="btn btn-primary w-100">Place Order</button>
           </form>
         </div>
       </div>

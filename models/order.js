@@ -43,9 +43,7 @@ const OrderModel = {
   },
 
   createOrder(orderData, items, callback) {
-    if (!Array.isArray(items) || items.length === 0) {
-      return callback(new Error('Order items are required'));
-    }
+    const safeItems = Array.isArray(items) ? items : [];
 
     db.beginTransaction((txErr) => {
       if (txErr) return callback(txErr);
@@ -61,7 +59,16 @@ const OrderModel = {
         if (orderErr) return db.rollback(() => callback(orderErr));
 
         const orderId = orderResult.insertId;
-        const itemValues = items.map((item) => [
+
+        // If no items provided, just commit the order creation.
+        if (!safeItems.length) {
+          return db.commit((commitErr) => {
+            if (commitErr) return db.rollback(() => callback(commitErr));
+            callback(null, { orderId });
+          });
+        }
+
+        const itemValues = safeItems.map((item) => [
           orderId,
           item.productId,
           item.quantity,

@@ -1,6 +1,34 @@
 const db = require('../db');
 
 const CartModel = {
+  getCartItemByProduct(userId, productId, callback) {
+    const sql = 'SELECT id, product_id AS productId, quantity FROM cart_items WHERE user_id = ? AND product_id = ? LIMIT 1';
+    db.query(sql, [userId, productId], (err, results) => {
+      if (err) {
+        if (err.code === 'ER_NO_SUCH_TABLE') return callback(null, { missingTable: true });
+        return callback(err);
+      }
+      callback(null, results[0] || null);
+    });
+  },
+
+  getCartItemWithProduct(userId, cartItemId, callback) {
+    const sql = `
+      SELECT ci.id, ci.product_id AS productId, ci.quantity AS cartQuantity, p.quantity AS productStock
+      FROM cart_items ci
+      JOIN products p ON p.id = ci.product_id
+      WHERE ci.id = ? AND ci.user_id = ?
+      LIMIT 1
+    `;
+    db.query(sql, [cartItemId, userId], (err, results) => {
+      if (err) {
+        if (err.code === 'ER_NO_SUCH_TABLE') return callback(null, { missingTable: true });
+        return callback(err);
+      }
+      callback(null, results[0] || null);
+    });
+  },
+
   getCartByUser(userId, callback) {
     // Use a compact SQL string to avoid accidental duplication/formatting issues
     const sql = 'SELECT ci.id AS cartItemId, ci.product_id AS productId, ci.quantity, 0 AS discount, p.productName, p.price, p.image FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.user_id = ? ORDER BY ci.id DESC';
@@ -61,6 +89,17 @@ const CartModel = {
       }
       if (result.affectedRows === 0) return callback(new Error('Cart item not found'));
       return callback(null, { deleted: true });
+    });
+  },
+
+  clearCartByUser(userId, callback) {
+    const sql = 'DELETE FROM cart_items WHERE user_id = ?';
+    db.query(sql, [userId], (err) => {
+      if (err) {
+        if (err.code === 'ER_NO_SUCH_TABLE') return callback(null, { missingTable: true });
+        return callback(err);
+      }
+      return callback(null, { cleared: true });
     });
   }
 };
