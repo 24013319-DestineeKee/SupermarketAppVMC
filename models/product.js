@@ -38,6 +38,11 @@ const ProductModel = {
     db.query(sql, params, (err, result) => callback(err, result));
   },
 
+  decrementQuantity(id, amount, callback) {
+    const sql = 'UPDATE products SET quantity = GREATEST(quantity - ?, 0) WHERE id = ?';
+    db.query(sql, [amount, id], (err, result) => callback(err, result));
+  },
+
   deleteProduct(id, callback) {
     const sql = 'DELETE FROM products WHERE id = ?';
     db.query(sql, [id], (err, result) => callback(err, result));

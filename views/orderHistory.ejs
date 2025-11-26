@@ -1,20 +1,18 @@
 <%- include('partials/header', {
-  title: 'Order Dashboard - Supermarket App',
+  title: 'My Orders - Supermarket App',
   user,
   navLinks: [
-    { href: '/orders', label: 'Orders' },
-    { href: '/users', label: 'Users' },
-    { href: '/inventory', label: 'Inventory' },
+    { href: '/my-orders', label: 'My Orders' },
+    { href: '/shopping', label: 'Shopping' },
+    { href: '/cart', label: 'Cart' },
     { href: '/logout', label: 'Logout' }
   ]
 }) %>
 
 <div class="container my-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Order Dashboard</h2>
-    <div class="d-flex gap-2">
-      <a href="/orders" class="btn btn-outline-primary btn-sm">Refresh</a>
-    </div>
+    <h2 class="mb-0">My Orders</h2>
+    <a href="/my-orders" class="btn btn-outline-primary btn-sm">Refresh</a>
   </div>
 
   <% if (messages && messages.error && messages.error.length) { %>
@@ -29,18 +27,16 @@
   <% } %>
 
   <% if (!orders || !orders.length) { %>
-    <div class="alert alert-info">No orders available.</div>
+    <div class="alert alert-info">You have no orders yet.</div>
   <% } else { %>
     <div class="table-responsive">
       <table class="table table-striped align-middle">
         <thead>
           <tr>
             <th>ID</th>
-            <th>User ID</th>
             <th>Status</th>
             <th>Total</th>
             <th>Items</th>
-            <th>Created</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -48,25 +44,20 @@
           <% orders.forEach(function(order){ %>
             <tr>
               <td>#<%= order.id %></td>
-              <td><%= order.userId %></td>
               <td><span class="badge bg-secondary text-uppercase"><%= order.status || 'pending' %></span></td>
               <td>$<%= (order.totalAmount || 0).toFixed(2) %></td>
               <td>
                 <% const count = (order.items && order.items.length) ? order.items.length : 0; %>
-                <button class="btn btn-sm btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#items-<%= order.id %>">
+                <button class="btn btn-sm btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#my-items-<%= order.id %>">
                   <%= count %> item<%= count === 1 ? '' : 's' %>
                 </button>
               </td>
-              <td><%= order.createdAt ? order.createdAt : '-' %></td>
-              <td class="d-flex gap-2">
-                <a class="btn btn-sm btn-outline-secondary" href="/orders/<%= order.id %>/edit">Edit</a>
-                <form action="/orders/<%= order.id %>/delete" method="POST" onsubmit="return confirm('Delete this order?');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                </form>
+              <td>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#my-items-<%= order.id %>">View Details</button>
               </td>
             </tr>
-            <tr class="collapse" id="items-<%= order.id %>">
-              <td colspan="7">
+            <tr class="collapse" id="my-items-<%= order.id %>">
+              <td colspan="5">
                 <% if (!order.items || !order.items.length) { %>
                   <div class="text-muted">No items.</div>
                 <% } else { %>

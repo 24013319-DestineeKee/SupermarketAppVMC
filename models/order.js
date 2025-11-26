@@ -8,7 +8,13 @@ const OrderModel = {
       if (!orders.length) return callback(null, []);
 
       const orderIds = orders.map((o) => o.id);
-      const itemsSql = 'SELECT id, orderId, productId, quantity, price FROM order_items WHERE orderId IN (?)';
+      const itemsSql = `
+        SELECT oi.id, oi.orderId, oi.productId, oi.quantity, oi.price,
+               p.productName, p.image
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.productId
+        WHERE oi.orderId IN (?)
+      `;
       db.query(itemsSql, [orderIds], (itemsErr, items) => {
         if (itemsErr) return callback(itemsErr);
 
@@ -34,10 +40,48 @@ const OrderModel = {
       const order = orderResults[0];
       if (!order) return callback(null, null);
 
-      const itemsSql = 'SELECT id, orderId, productId, quantity, price FROM order_items WHERE orderId = ?';
+      const itemsSql = `
+        SELECT oi.id, oi.orderId, oi.productId, oi.quantity, oi.price,
+               p.productName, p.image
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.productId
+        WHERE oi.orderId = ?
+      `;
       db.query(itemsSql, [id], (itemsErr, items) => {
         if (itemsErr) return callback(itemsErr);
         callback(null, { ...order, items: items || [] });
+      });
+    });
+  },
+
+  getOrdersByUser(userId, callback) {
+    const orderSql = 'SELECT id, userId, totalAmount, status FROM orders WHERE userId = ?';
+    db.query(orderSql, [userId], (orderErr, orders) => {
+      if (orderErr) return callback(orderErr);
+      if (!orders.length) return callback(null, []);
+
+      const orderIds = orders.map((o) => o.id);
+      const itemsSql = `
+        SELECT oi.id, oi.orderId, oi.productId, oi.quantity, oi.price,
+               p.productName, p.image
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.productId
+        WHERE oi.orderId IN (?)
+      `;
+      db.query(itemsSql, [orderIds], (itemsErr, items) => {
+        if (itemsErr) return callback(itemsErr);
+
+        const itemsByOrder = {};
+        items.forEach((item) => {
+          if (!itemsByOrder[item.orderId]) itemsByOrder[item.orderId] = [];
+          itemsByOrder[item.orderId].push(item);
+        });
+
+        const hydrated = orders.map((order) => ({
+          ...order,
+          items: itemsByOrder[order.id] || []
+        }));
+        callback(null, hydrated);
       });
     });
   },

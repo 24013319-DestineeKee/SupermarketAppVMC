@@ -114,8 +114,10 @@ const CartController = {
       const { cart, cartTotal } = mapCartItems(items);
       const orderItems = cart.map((item) => ({
         productId: item.productId,
-        quantity: item.quantity,
-        price: item.discountedPrice
+        quantity: Number(item.quantity),
+        price: item.discountedPrice,
+        productName: item.productName,
+        image: item.image
       }));
 
       const checkoutDetails = {
@@ -138,15 +140,53 @@ const CartController = {
           return res.redirect('/cart');
         }
 
-        CartModel.clearCartByUser(userId, (clearErr) => {
-          if (clearErr) console.error('Error clearing cart after checkout:', clearErr);
-          res.render('invoice', {
-            orderId: result.orderId,
-            cart,
-            cartTotal,
-            checkout: checkoutDetails,
-            user: req.session.user
+        const renderInvoice = (orderData) => {
+          CartModel.clearCartByUser(userId, (clearErr) => {
+            if (clearErr) console.error('Error clearing cart after checkout:', clearErr);
+            res.render('invoice', {
+              order: orderData,
+              orderId: orderData && orderData.id ? orderData.id : result.orderId,
+              checkout: checkoutDetails,
+              user: req.session.user
+            });
           });
+        };
+
+        const updateStock = (cb) => {
+          const tasks = orderItems.map((item) => new Promise((resolve) => {
+            ProductModel.decrementQuantity(item.productId, item.quantity, (decErr) => {
+              if (decErr) console.error('Error decrementing stock', decErr);
+              resolve();
+            });
+          }));
+          Promise.all(tasks).then(() => cb());
+        };
+
+        OrderModel.getOrderById(result.orderId, (fetchErr, order) => {
+          if (fetchErr || !order) {
+            // Fallback if fetch fails
+            const fallbackOrder = {
+              id: result.orderId,
+              userId,
+              totalAmount: cartTotal,
+              status: 'processing',
+              items: orderItems
+            };
+            return updateStock(() => renderInvoice(fallbackOrder));
+          }
+
+          const enriched = {
+            ...order,
+            items: order.items.map((it) => {
+              const fromCart = orderItems.find((ci) => ci.productId === it.productId);
+              return {
+                ...it,
+                productName: it.productName || (fromCart && fromCart.productName) || '',
+                image: it.image || (fromCart && fromCart.image) || ''
+              };
+            })
+          };
+          updateStock(() => renderInvoice(enriched));
         });
       });
     });

@@ -60,8 +60,8 @@ const checkAdmin = (req, res, next) => {
 
 // --- validation middleware for register ---
 const validateRegistration = (req, res, next) => {
-  const { username, email, password, address, contact, role } = req.body;
-  if (!username || !email || !password || !address || !contact || !role) {
+  const { username, email, password, address, contact } = req.body;
+  if (!username || !email || !password || !address || !contact) {
     req.flash('error', 'All fields are required.');
     req.flash('formData', req.body);
     return res.redirect('/register');
@@ -95,9 +95,9 @@ app.get('/register', (req, res) => {
 });
 
 app.post('/register', validateRegistration, (req, res) => {
-  const { username, email, password, address, contact, role } = req.body;
+  const { username, email, password, address, contact } = req.body;
   const hashed = crypto.createHash('sha1').update(password).digest('hex');
-  const user = { username, email, password: hashed, address, contact, role };
+  const user = { username, email, password: hashed, address, contact, role: 'user' };
 
   // Use model to add user and then redirect (controller API exists for JSON; keep view UX here)
   UserModel.addUser(user, (err) => {
@@ -161,6 +161,18 @@ app.get('/cart', checkAuthenticated, CartController.viewCart);
 app.get('/checkout', checkAuthenticated, CartController.viewCheckout);
 app.post('/checkout', checkAuthenticated, CartController.processCheckout);
 
+// User order history
+app.get('/my-orders', checkAuthenticated, (req, res) => {
+  OrderModel.getOrdersByUser(req.session.user.id, (err, orders) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to load your orders.');
+      return res.render('orderHistory', { orders: [], user: req.session.user });
+    }
+    res.render('orderHistory', { orders: orders || [], user: req.session.user });
+  });
+});
+
 app.get('/product/:id', checkAuthenticated, (req, res) => {
   const productId = parseInt(req.params.id, 10);
   ProductModel.getProductById(productId, (err, product) => {
@@ -212,28 +224,6 @@ app.get('/orders', checkAuthenticated, checkAdmin, (req, res) => {
       return res.render('orderDashboard', { orders: [], user: req.session.user });
     }
     res.render('orderDashboard', { orders: orders || [], user: req.session.user });
-  });
-});
-
-app.get('/orders/new', checkAuthenticated, checkAdmin, (req, res) => {
-  res.render('editOrder', { order: null, user: req.session.user });
-});
-
-app.post('/orders/new', checkAuthenticated, checkAdmin, (req, res) => {
-  const { userId, totalAmount, status } = req.body;
-  const orderData = {
-    userId: Number(userId),
-    totalAmount: totalAmount != null ? Number(totalAmount) : 0,
-    status: status || 'pending'
-  };
-  OrderModel.createOrder(orderData, [], (err) => {
-    if (err) {
-      console.error('DB error:', err);
-      req.flash('error', 'Unable to create order.');
-      return res.redirect('/orders/new');
-    }
-    req.flash('success', 'Order created.');
-    res.redirect('/orders');
   });
 });
 
@@ -292,6 +282,34 @@ app.post('/orders/:id/edit', checkAuthenticated, checkAdmin, (req, res) => {
     }
     req.flash('success', 'Order updated.');
     res.redirect('/orders');
+  });
+});
+
+app.get('/invoice/:id', checkAuthenticated, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).send('Invalid order id');
+
+  OrderModel.getOrderById(id, (err, order) => {
+    if (err) {
+      console.error('DB error:', err);
+      return res.status(500).send('Database error');
+    }
+    if (!order) return res.status(404).send('Order not found');
+
+    // Only allow owner or admin to view
+    if (req.session.user.role !== 'admin' && order.userId !== req.session.user.id) {
+      req.flash('error', 'Access denied.');
+      return res.redirect('/shopping');
+    }
+
+    const checkout = {
+      fullName: req.session.user.username || '',
+      email: req.session.user.email || '',
+      address: req.session.user.address || '',
+      contact: req.session.user.contact || ''
+    };
+
+    res.render('invoice', { order, orderId: order.id, checkout, user: req.session.user });
   });
 });
 

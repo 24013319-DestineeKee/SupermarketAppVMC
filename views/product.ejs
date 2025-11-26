@@ -5,11 +5,18 @@
   user,
   navLinks: (user && user.role === 'admin')
     ? [
+        { href: '/orders', label: 'Orders' },
+        { href: '/users', label: 'Users' },
         { href: '/inventory', label: 'Inventory' },
         { href: '/addProduct', label: 'Add new product' },
         { href: '/logout', label: 'Logout' }
       ]
-    : [{ href: '/logout', label: 'Logout' }]
+    : [
+        { href: '/my-orders', label: 'My Orders' },
+        { href: '/shopping', label: 'Shopping' },
+        { href: '/cart', label: 'Cart' },
+        { href: '/logout', label: 'Logout' }
+      ]
 }) %>
 
 <div class="container">
