@@ -152,14 +152,17 @@ const CartController = {
           });
         };
 
-        const updateStock = (cb) => {
-          const tasks = orderItems.map((item) => new Promise((resolve) => {
+        const updateStock = () => {
+          const tasks = orderItems.map((item) => new Promise((resolve, reject) => {
             ProductModel.decrementQuantity(item.productId, item.quantity, (decErr) => {
-              if (decErr) console.error('Error decrementing stock', decErr);
+              if (decErr) {
+                console.error('Error decrementing stock', decErr);
+                return reject(decErr);
+              }
               resolve();
             });
           }));
-          Promise.all(tasks).then(() => cb());
+          return Promise.all(tasks);
         };
 
         OrderModel.getOrderById(result.orderId, (fetchErr, order) => {
@@ -172,7 +175,9 @@ const CartController = {
               status: 'processing',
               items: orderItems
             };
-            return updateStock(() => renderInvoice(fallbackOrder));
+            return updateStock()
+              .catch((err) => console.error('Stock update error:', err))
+              .finally(() => renderInvoice(fallbackOrder));
           }
 
           const enriched = {
@@ -186,7 +191,9 @@ const CartController = {
               };
             })
           };
-          updateStock(() => renderInvoice(enriched));
+          updateStock()
+            .catch((err) => console.error('Stock update error:', err))
+            .finally(() => renderInvoice(enriched));
         });
       });
     });
