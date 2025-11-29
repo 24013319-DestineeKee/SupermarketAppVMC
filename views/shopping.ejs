@@ -20,7 +20,25 @@
       <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
     </div>
   <% } %>
-  <br>
+  <form class="row g-3 mb-3" id="productFilters">
+    <div class="col-md-6">
+      <label class="form-label" for="searchName">Search</label>
+      <input type="text" id="searchName" class="form-control" placeholder="Search products...">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="categoryFilter">Category</label>
+      <select id="categoryFilter" class="form-select">
+        <option value="all" selected>All categories</option>
+        <option value="uncategorized">Uncategorized</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="noImageOnly">
+        <label class="form-check-label" for="noImageOnly">No image only</label>
+      </div>
+    </div>
+  </form>
   <div class="text-center"><h2>Products from Supermarket</h2></div>
   <br>
   <table class="table table-hover small text-center">
@@ -36,9 +54,19 @@
     </thead>
     <tbody>
       <% for(let i=0; i < products.length; i++) { %>
+        <% const category = products[i].category || 'Uncategorized'; %>
         <tr>
-          <td><a href="/product/<%= products[i].id %>"><%= products[i].productName %></a></td>
-          <td><img src="images/<%= products[i].image %>" width="20%"></td>
+          <td data-name="<%= products[i].productName.toLowerCase() %>" data-category="<%= category.toLowerCase() %>" data-has-image="<%= products[i].image ? '1' : '0' %>">
+            <a href="/product/<%= products[i].id %>"><%= products[i].productName %></a>
+            <div class="small text-muted"><%= category %></div>
+          </td>
+          <td>
+            <% if (products[i].image) { %>
+              <img src="images/<%= products[i].image %>" width="20%" loading="lazy" onerror="this.classList.add('d-none'); this.insertAdjacentHTML('afterend','<span class=&quot;text-muted&quot;>No image</span>');">
+            <% } else { %>
+              <span class="text-muted">No image</span>
+            <% } %>
+          </td>
           <td><%= products[i].quantity %></td>
           <td>$<%= products[i].price.toFixed(2) %></td>
           <td colspan="2">
@@ -52,5 +80,59 @@
     </tbody>
   </table>
 </div>
+
+<script>
+  (function() {
+    const searchInput = document.getElementById('searchName');
+    const categorySelect = document.getElementById('categoryFilter');
+    const noImageCheckbox = document.getElementById('noImageOnly');
+    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+
+    const allowedCategories = [
+      'produce (fruits & vegetables)',
+      'meat & seafood',
+      'dairy & eggs',
+      'bakery',
+      'pantry (dry goods, canned, condiments, pasta/rice)',
+      'beverages (water, juice, soda, tea/coffee)',
+      'frozen foods',
+      'snacks & confectionery',
+      'household & cleaning',
+      'health & beauty / personal care',
+      'pet supplies',
+      'other'
+    ];
+
+    allowedCategories.forEach((cat) => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+      categorySelect.appendChild(opt);
+    });
+
+    function applyFilters() {
+      const term = (searchInput.value || '').toLowerCase();
+      const category = categorySelect.value;
+      const noImageOnly = noImageCheckbox.checked;
+
+      rows.forEach((row) => {
+        const cell = row.querySelector('td[data-name]');
+        const name = cell?.dataset.name || '';
+        const cat = cell?.dataset.category || 'uncategorized';
+        const hasImage = cell?.dataset.hasImage === '1';
+
+        const matchesName = !term || name.includes(term);
+        const matchesCategory = category === 'all' || cat === category;
+        const matchesImage = !noImageOnly || !hasImage;
+
+        row.style.display = (matchesName && matchesCategory && matchesImage) ? '' : 'none';
+      });
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    categorySelect.addEventListener('change', applyFilters);
+    noImageCheckbox.addEventListener('change', applyFilters);
+  })();
+</script>
 
 <%- include('partials/footer') %>

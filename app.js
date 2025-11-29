@@ -135,7 +135,9 @@ app.post('/login', (req, res) => {
       req.flash('error', 'Invalid email or password.');
       return res.redirect('/login');
     }
-    req.session.user = found;
+    // Use email as the display identifier after login so views that reference `user.username`
+    // will show the customer's email instead of their name.
+    req.session.user = { ...found, username: found.email };
     req.flash('success', 'Login successful!');
     return found.role === 'user' ? res.redirect('/shopping') : res.redirect('/inventory');
   });
@@ -186,9 +188,10 @@ app.get('/product/:id', checkAuthenticated, (req, res) => {
 app.get('/addProduct', checkAuthenticated, checkAdmin, (req, res) => res.render('addProduct', { user: req.session.user }));
 
 app.post('/addProduct', checkAuthenticated, checkAdmin, upload.single('image'), (req, res) => {
-  const { name, quantity, price } = req.body;
+  const { name, quantity, price, category, customCategory } = req.body;
+  const chosenCategory = (category === 'Other' ? (customCategory || '') : category) || 'Uncategorized';
   const image = req.file ? req.file.filename : null;
-  const product = { productName: name, quantity: Number(quantity), price: Number(price), image };
+  const product = { productName: name, quantity: Number(quantity), price: Number(price), image, category: chosenCategory || null };
   ProductModel.addProduct(product, (err) => {
     if (err) return res.status(500).send('Error adding product');
     res.redirect('/inventory');
@@ -206,9 +209,10 @@ app.get('/updateProduct/:id', checkAuthenticated, checkAdmin, (req, res) => {
 
 app.post('/updateProduct/:id', checkAuthenticated, checkAdmin, upload.single('image'), (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const { name, quantity, price, currentImage } = req.body;
+  const { name, quantity, price, currentImage, category, customCategory } = req.body;
+  const chosenCategory = (category === 'Other' ? (customCategory || '') : category) || 'Uncategorized';
   const image = req.file ? req.file.filename : (currentImage || null);
-  const product = { productName: name, quantity: Number(quantity), price: Number(price), image };
+  const product = { productName: name, quantity: Number(quantity), price: Number(price), image, category: chosenCategory || null };
   ProductModel.updateProduct(id, product, (err) => {
     if (err) return res.status(500).send('Error updating product');
     res.redirect('/inventory');

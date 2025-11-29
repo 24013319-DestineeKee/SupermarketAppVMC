@@ -23,6 +23,26 @@
       </div>
 
       <div class="mb-3">
+        <label for="category" class="form-label">Category</label>
+        <select id="category" name="category" class="form-select" onchange="toggleCustomCategory(this.value)" required>
+          <option value="">Select a category</option>
+          <option value="Produce (Fruits & Vegetables)" <%= product.category === 'Produce (Fruits & Vegetables)' ? 'selected' : '' %>>Produce (Fruits & Vegetables)</option>
+          <option value="Meat & Seafood" <%= product.category === 'Meat & Seafood' ? 'selected' : '' %>>Meat & Seafood</option>
+          <option value="Dairy & Eggs" <%= product.category === 'Dairy & Eggs' ? 'selected' : '' %>>Dairy & Eggs</option>
+          <option value="Bakery" <%= product.category === 'Bakery' ? 'selected' : '' %>>Bakery</option>
+          <option value="Pantry (Dry Goods, Canned, Condiments, Pasta/Rice)" <%= product.category === 'Pantry (Dry Goods, Canned, Condiments, Pasta/Rice)' ? 'selected' : '' %>>Pantry (Dry Goods, Canned, Condiments, Pasta/Rice)</option>
+          <option value="Beverages (Water, Juice, Soda, Tea/Coffee)" <%= product.category === 'Beverages (Water, Juice, Soda, Tea/Coffee)' ? 'selected' : '' %>>Beverages (Water, Juice, Soda, Tea/Coffee)</option>
+          <option value="Frozen Foods" <%= product.category === 'Frozen Foods' ? 'selected' : '' %>>Frozen Foods</option>
+          <option value="Snacks & Confectionery" <%= product.category === 'Snacks & Confectionery' ? 'selected' : '' %>>Snacks & Confectionery</option>
+          <option value="Household & Cleaning" <%= product.category === 'Household & Cleaning' ? 'selected' : '' %>>Household & Cleaning</option>
+          <option value="Health & Beauty / Personal Care" <%= product.category === 'Health & Beauty / Personal Care' ? 'selected' : '' %>>Health & Beauty / Personal Care</option>
+          <option value="Pet Supplies" <%= product.category === 'Pet Supplies' ? 'selected' : '' %>>Pet Supplies</option>
+          <option value="Other" <%= !product.category || product.category === 'Other' ? 'selected' : '' %>>Other (type below)</option>
+        </select>
+        <input type="text" id="customCategory" name="customCategory" class="form-control mt-2" placeholder="Enter category" style="display: <%= (!product.category || product.category === 'Other') ? 'block' : 'none' %>;">
+      </div>
+
+      <div class="mb-3">
         <label for="quantity" class="form-label">Quantity</label>
         <input type="number" class="form-control" id="quantity" name="quantity" min="0" step="1" value="<%= product.quantity %>" required>
       </div>
@@ -52,5 +72,13 @@
     <p class="text-center">No product found.</p>
   <% } %>
 </div>
+
+<script>
+  function toggleCustomCategory(value) {
+    const custom = document.getElementById('customCategory');
+    custom.style.display = value === 'Other' ? 'block' : 'none';
+    if (value !== 'Other') custom.value = '';
+  }
+</script>
 
 <%- include('partials/footer') %>

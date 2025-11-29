@@ -87,7 +87,7 @@
                             <td><%= item.productName || ('Product #' + item.productId) %></td>
                             <td>
                               <% if (item.image) { %>
-                                <img src="/images/<%= item.image %>" alt="<%= item.productName %>" style="width: 50px;">
+                                <img src="/images/<%= item.image %>" alt="<%= item.productName %>" style="width: 50px;" loading="lazy" onerror="this.classList.add('d-none'); this.insertAdjacentHTML('afterend','<span class=&quot;text-muted&quot;>N/A</span>');">
                               <% } else { %>
                                 <span class="text-muted">N/A</span>
                               <% } %>

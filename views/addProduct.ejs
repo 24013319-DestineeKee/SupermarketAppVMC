@@ -21,6 +21,27 @@
     </div>
 
     <div class="mb-3">
+      <label for="category" class="form-label">Category</label>
+      <select id="category" name="category" class="form-select" onchange="toggleCustomCategory(this.value)" required>
+        <option value="">Select a category</option>
+        <option value="Produce (Fruits & Vegetables)">Produce (Fruits & Vegetables)</option>
+        <option value="Meat & Seafood">Meat & Seafood</option>
+        <option value="Dairy & Eggs">Dairy & Eggs</option>
+        <option value="Bakery">Bakery</option>
+        <option value="Pantry (Dry Goods, Canned, Condiments, Pasta/Rice)">Pantry (Dry Goods, Canned, Condiments, Pasta/Rice)</option>
+        <option value="Beverages (Water, Juice, Soda, Tea/Coffee)">Beverages (Water, Juice, Soda, Tea/Coffee)</option>
+        <option value="Frozen Foods">Frozen Foods</option>
+        <option value="Snacks & Confectionery">Snacks & Confectionery</option>
+        <option value="Household & Cleaning">Household & Cleaning</option>
+        <option value="Health & Beauty / Personal Care">Health & Beauty / Personal Care</option>
+        <option value="Pet Supplies">Pet Supplies</option>
+        <option value="International / Ethnic Foods">International / Ethnic Foods</option>
+        <option value="Other">Other (type below)</option>
+      </select>
+      <input type="text" id="customCategory" name="customCategory" class="form-control mt-2" placeholder="Enter category" style="display: none;">
+    </div>
+
+    <div class="mb-3">
       <label for="quantity" class="form-label">Quantity</label>
       <input type="number" class="form-control" id="quantity" name="quantity" min="0" step="1" required>
     </div>
@@ -32,7 +53,7 @@
 
     <div class="mb-4">
       <label for="image" class="form-label">Product Image</label>
-      <input class="form-control" type="file" id="image" name="image" accept="image/*" required>
+      <input class="form-control" type="file" id="image" name="image" accept="image/*">
     </div>
 
     <div class="d-grid">
@@ -41,5 +62,13 @@
 
   </form>
 </div>
+
+<script>
+  function toggleCustomCategory(value) {
+    const custom = document.getElementById('customCategory');
+    custom.style.display = value === 'Other' ? 'block' : 'none';
+    if (value !== 'Other') custom.value = '';
+  }
+</script>
 
 <%- include('partials/footer') %>

@@ -30,7 +30,13 @@
       <% for(let i=0; i < products.length; i++) { %>
         <tr>
           <td><a href="/product/<%= products[i].id %>"><%= products[i].productName %></a></td>
-          <td><img src="images/<%= products[i].image %>" width="20%"></td>
+          <td>
+            <% if (products[i].image) { %>
+              <img src="images/<%= products[i].image %>" width="20%">
+            <% } else { %>
+              <span class="text-muted">No image</span>
+            <% } %>
+          </td>
           <td><%= products[i].quantity %></td>
           <td>$<%= products[i].price.toFixed(2) %></td>
           <!-- Edit Link -->

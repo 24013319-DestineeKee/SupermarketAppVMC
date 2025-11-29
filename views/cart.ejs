@@ -48,7 +48,11 @@
               <tr>
                 <td>
                   <div class="d-flex align-items-center">
-                    <img src="/images/<%= item.image %>" alt="<%= item.productName %>" width="60" class="me-3">
+                    <% if (item.image) { %>
+                      <img src="/images/<%= item.image %>" alt="<%= item.productName %>" width="60" class="me-3" loading="lazy" onerror="this.classList.add('d-none'); this.insertAdjacentHTML('afterend','<span class=&quot;text-muted&quot;>No image</span>');">
+                    <% } else { %>
+                      <span class="text-muted me-3">No image</span>
+                    <% } %>
                     <div>
                       <div class="fw-bold"><%= item.productName %></div>
                     </div>
