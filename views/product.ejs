@@ -29,7 +29,7 @@
       <p><b>Product Name:</b><br> <%= product.productName %></p>
       <p><b>Product Image:</b><br>
         <% if (product.image) { %>
-          <img src="../images/<%= product.image %>" width="20%">
+          <img src="/images/<%= product.image %>" class="product-thumb" alt="<%= product.productName %>">
         <% } else { %>
           <span class="text-muted">No image</span>
         <% } %>

@@ -62,7 +62,7 @@
           </td>
           <td>
             <% if (products[i].image) { %>
-              <img src="images/<%= products[i].image %>" width="20%" loading="lazy" onerror="this.classList.add('d-none'); this.insertAdjacentHTML('afterend','<span class=&quot;text-muted&quot;>No image</span>');">
+              <img src="/images/<%= products[i].image %>" class="product-thumb" loading="lazy" alt="<%= products[i].productName %>" onerror="this.classList.add('d-none'); this.insertAdjacentHTML('afterend','<span class=&quot;text-muted&quot;>No image</span>');">
             <% } else { %>
               <span class="text-muted">No image</span>
             <% } %>

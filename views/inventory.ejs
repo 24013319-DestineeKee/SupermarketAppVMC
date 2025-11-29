@@ -32,7 +32,7 @@
           <td><a href="/product/<%= products[i].id %>"><%= products[i].productName %></a></td>
           <td>
             <% if (products[i].image) { %>
-              <img src="images/<%= products[i].image %>" width="20%">
+              <img src="/images/<%= products[i].image %>" class="product-thumb" alt="<%= products[i].productName %>">
             <% } else { %>
               <span class="text-muted">No image</span>
             <% } %>

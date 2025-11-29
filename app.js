@@ -3,6 +3,7 @@ const session = require('express-session');
 const flash = require('connect-flash');
 const multer = require('multer');
 const crypto = require('crypto');
+const path = require('path');
 
 const ProductModel = require('./models/product');
 const UserModel = require('./models/user');
@@ -16,9 +17,21 @@ const app = express();
 // --- Multer for uploads (product images / optional user pictures) ---
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'public/images'),
-  filename: (req, file, cb) => cb(null, file.originalname)
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '';
+    const base = path.basename(file.originalname, ext).replace(/[^a-z0-9_-]/gi, '_');
+    cb(null, `${base}-${Date.now()}${ext.toLowerCase()}`);
+  }
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image uploads are allowed'));
+    }
+    cb(null, true);
+  }
+});
 
 // NOTE: direct mysql connection removed — models/controllers use require('../db')
 
