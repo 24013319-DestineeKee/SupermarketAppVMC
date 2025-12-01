@@ -52,8 +52,14 @@
                   <%= count %> item<%= count === 1 ? '' : 's' %>
                 </button>
               </td>
-              <td>
+              <td class="d-flex gap-2">
                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#my-items-<%= order.id %>">View Details</button>
+                <a class="btn btn-sm btn-outline-primary" href="/invoice/<%= order.id %>">Invoice</a>
+                <% if ((order.status || '').toLowerCase() !== 'completed') { %>
+                  <form action="/orders/<%= order.id %>/complete" method="POST" onsubmit="return confirm('Mark this order as completed?');">
+                    <button type="submit" class="btn btn-sm btn-success">Confirm Delivery</button>
+                  </form>
+                <% } %>
               </td>
             </tr>
             <tr class="collapse" id="my-items-<%= order.id %>">

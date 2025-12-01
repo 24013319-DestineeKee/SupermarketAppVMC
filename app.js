@@ -50,8 +50,17 @@ app.use(session({
 }));
 app.use(flash());
 
+// helper to enrich user with a displayName
+const enrichUser = (user) => {
+  if (!user) return null;
+  return { ...user, displayName: user.username || user.email };
+};
+
 // expose flash messages to all views as `messages`
 app.use((req, res, next) => {
+  if (req.session && req.session.user) {
+    req.session.user = enrichUser(req.session.user);
+  }
   res.locals.messages = {
     success: req.flash('success') || [],
     error: req.flash('error') || []
@@ -148,9 +157,8 @@ app.post('/login', (req, res) => {
       req.flash('error', 'Invalid email or password.');
       return res.redirect('/login');
     }
-    // Use email as the display identifier after login so views that reference `user.username`
-    // will show the customer's email instead of their name.
-    req.session.user = { ...found, username: found.email };
+    // Preserve the stored username for display.
+    req.session.user = found;
     req.flash('success', 'Login successful!');
     return found.role === 'user' ? res.redirect('/shopping') : res.redirect('/inventory');
   });
@@ -185,6 +193,39 @@ app.get('/my-orders', checkAuthenticated, (req, res) => {
       return res.render('orderHistory', { orders: [], user: req.session.user });
     }
     res.render('orderHistory', { orders: orders || [], user: req.session.user });
+  });
+});
+
+app.post('/orders/:id/complete', checkAuthenticated, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    req.flash('error', 'Invalid order id.');
+    return res.redirect('/my-orders');
+  }
+  OrderModel.getOrderById(id, (err, order) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to update order.');
+      return res.redirect('/my-orders');
+    }
+    if (!order) {
+      req.flash('error', 'Order not found.');
+      return res.redirect('/my-orders');
+    }
+    // only owner or admin may complete
+    if (req.session.user.role !== 'admin' && order.userId !== req.session.user.id) {
+      req.flash('error', 'Access denied.');
+      return res.redirect('/my-orders');
+    }
+    OrderModel.updateStatus(id, 'completed', (updateErr) => {
+      if (updateErr) {
+        console.error('DB error:', updateErr);
+        req.flash('error', 'Unable to mark as completed.');
+        return res.redirect('/my-orders');
+      }
+      req.flash('success', 'Order marked as completed.');
+      res.redirect('/my-orders');
+    });
   });
 });
 

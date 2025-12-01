@@ -33,6 +33,11 @@ const OrderModel = {
     });
   },
 
+  updateStatus(id, status, callback) {
+    const sql = 'UPDATE orders SET status = ? WHERE id = ?';
+    db.query(sql, [status, id], (err, result) => callback(err, result));
+  },
+
   getOrderById(id, callback) {
     const orderSql = 'SELECT id, userId, totalAmount, status FROM orders WHERE id = ?';
     db.query(orderSql, [id], (orderErr, orderResults) => {

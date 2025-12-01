@@ -20,7 +20,7 @@
 }) %>
 
 <div class="container">
-  <p>Welcome, <%= user.username %> (<%= user.role %>)</p>
+  <p>Welcome, <%= user.displayName || user.username || user.email %> (<%= user.role %>)</p>
   <br>
   <div class="text-center"><h2>Product Details</h2></div>
   <br>

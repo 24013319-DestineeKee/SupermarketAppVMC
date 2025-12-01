@@ -9,7 +9,7 @@
 }) %>
 
 <div class="container">
-  <p>Welcome, <%= user.username %> (<%= user.role %>)</p>
+  <p>Welcome, <%= user.displayName || user.username || user.email %> (<%= user.role %>)</p>
   <% if (messages && messages.error && messages.error.length) { %>
     <div class="alert alert-danger">
       <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>

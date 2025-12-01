@@ -62,8 +62,26 @@ const CartController = {
         return res.redirect('/shopping');
       }
 
-      const { cart, cartTotal } = mapCartItems(items);
-      res.render('checkout', { cart, cartTotal, user: req.session.user, formData: req.flash('formData')[0] });
+      OrderModel.getOrdersByUser(userId, (orderErr, orders) => {
+        if (orderErr) {
+          console.error('Error checking orders:', orderErr);
+          req.flash('error', 'Unable to load checkout right now.');
+          return res.redirect('/shopping');
+        }
+
+        const { cart, cartTotal } = mapCartItems(items);
+        const discountEligible = !orders || orders.length === 0;
+        const discountedTotal = discountEligible ? Number((cartTotal * 0.75).toFixed(2)) : cartTotal;
+
+        res.render('checkout', {
+          cart,
+          cartTotal,
+          discountedTotal,
+          discountEligible,
+          user: req.session.user,
+          formData: req.flash('formData')[0]
+        });
+      });
     });
   },
 
@@ -112,52 +130,70 @@ const CartController = {
       }
 
       const { cart, cartTotal } = mapCartItems(items);
-      const orderItems = cart.map((item) => ({
-        productId: item.productId,
-        quantity: Number(item.quantity),
-        price: item.discountedPrice,
-        productName: item.productName,
-        image: item.image
-      }));
 
-      const checkoutDetails = {
-        fullName: fullName || req.session.user.username || '',
-        address: address || req.session.user.address || '',
-        contact: contact || req.session.user.contact || '',
-        email: email || req.session.user.email || ''
-      };
-
-      const payload = {
-        userId,
-        totalAmount: cartTotal,
-        status: 'processing'
-      };
-
-      OrderModel.createOrder(payload, orderItems, (orderErr, result) => {
-        if (orderErr) {
-          console.error('Error creating order:', orderErr);
-          req.flash('error', 'Unable to place order.');
+      OrderModel.getOrdersByUser(userId, (orderFetchErr, existingOrders) => {
+        if (orderFetchErr) {
+          console.error('Error checking existing orders:', orderFetchErr);
+          req.flash('error', 'Unable to complete checkout right now.');
           return res.redirect('/cart');
         }
 
-        const renderInvoice = (orderData) => {
-          CartModel.clearCartByUser(userId, (clearErr) => {
-            if (clearErr) console.error('Error clearing cart after checkout:', clearErr);
-            res.render('invoice', {
-              order: orderData,
-              orderId: orderData && orderData.id ? orderData.id : result.orderId,
-              checkout: checkoutDetails,
-              user: req.session.user
-            });
-          });
+        const isFirstOrder = !existingOrders || existingOrders.length === 0;
+        const discountedTotal = isFirstOrder ? Number((cartTotal * 0.75).toFixed(2)) : cartTotal;
+
+        const orderItems = cart.map((item) => ({
+          productId: item.productId,
+          quantity: Number(item.quantity),
+          price: item.discountedPrice,
+          productName: item.productName,
+          image: item.image
+        }));
+
+        const checkoutDetails = {
+          fullName: fullName || req.session.user.username || '',
+          address: address || req.session.user.address || '',
+          contact: contact || req.session.user.contact || '',
+          email: email || req.session.user.email || '',
+          discountApplied: isFirstOrder ? '25% first order discount applied' : ''
         };
+
+        const payload = {
+          userId,
+          totalAmount: discountedTotal,
+          status: 'processing'
+        };
+
+        OrderModel.createOrder(payload, orderItems, (orderErr, result) => {
+          if (orderErr) {
+            console.error('Error creating order:', orderErr);
+            req.flash('error', 'Unable to place order.');
+            return res.redirect('/cart');
+          }
+
+          const renderInvoice = (orderData) => {
+            CartModel.clearCartByUser(userId, (clearErr) => {
+              if (clearErr) console.error('Error clearing cart after checkout:', clearErr);
+              res.render('invoice', {
+                order: orderData,
+                orderId: orderData && orderData.id ? orderData.id : result.orderId,
+                checkout: checkoutDetails,
+                user: req.session.user
+              });
+            });
+          };
 
         const updateStock = () => {
           const tasks = orderItems.map((item) => new Promise((resolve, reject) => {
-            ProductModel.decrementQuantity(item.productId, item.quantity, (decErr) => {
+            ProductModel.decrementQuantity(item.productId, item.quantity, (decErr, result) => {
               if (decErr) {
                 console.error('Error decrementing stock', decErr);
                 return reject(decErr);
+              }
+              // If no rows were updated, surface as an error to avoid silently skipping.
+              if (result && result.affectedRows === 0) {
+                const errMsg = `No stock updated for product ${item.productId}`;
+                console.error(errMsg);
+                return reject(new Error(errMsg));
               }
               resolve();
             });
@@ -165,35 +201,37 @@ const CartController = {
           return Promise.all(tasks);
         };
 
-        OrderModel.getOrderById(result.orderId, (fetchErr, order) => {
-          if (fetchErr || !order) {
-            // Fallback if fetch fails
-            const fallbackOrder = {
-              id: result.orderId,
-              userId,
-              totalAmount: cartTotal,
-              status: 'processing',
-              items: orderItems
-            };
-            return updateStock()
-              .catch((err) => console.error('Stock update error:', err))
-              .finally(() => renderInvoice(fallbackOrder));
-          }
-
-          const enriched = {
-            ...order,
-            items: order.items.map((it) => {
-              const fromCart = orderItems.find((ci) => ci.productId === it.productId);
-              return {
-                ...it,
-                productName: it.productName || (fromCart && fromCart.productName) || '',
-                image: it.image || (fromCart && fromCart.image) || ''
+          OrderModel.getOrderById(result.orderId, (fetchErr, order) => {
+            if (fetchErr || !order) {
+              // Fallback if fetch fails
+              const fallbackOrder = {
+                id: result.orderId,
+                userId,
+                totalAmount: discountedTotal,
+                status: 'processing',
+                items: orderItems
               };
-            })
-          };
-          updateStock()
-            .catch((err) => console.error('Stock update error:', err))
-            .finally(() => renderInvoice(enriched));
+              return updateStock()
+                .catch((err) => console.error('Stock update error:', err))
+                .finally(() => renderInvoice(fallbackOrder));
+            }
+
+            const enriched = {
+              ...order,
+              totalAmount: discountedTotal,
+              items: order.items.map((it) => {
+                const fromCart = orderItems.find((ci) => ci.productId === it.productId);
+                return {
+                  ...it,
+                  productName: it.productName || (fromCart && fromCart.productName) || '',
+                  image: it.image || (fromCart && fromCart.image) || ''
+                };
+              })
+            };
+            updateStock()
+              .catch((err) => console.error('Stock update error:', err))
+              .finally(() => renderInvoice(enriched));
+          });
         });
       });
     });
