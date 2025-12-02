@@ -19,32 +19,56 @@
       ]
 }) %>
 
-<div class="container">
-  <p>Welcome, <%= user.displayName || user.username || user.email %> (<%= user.role %>)</p>
-  <br>
-  <div class="text-center"><h2>Product Details</h2></div>
-  <br>
-  <% if (product) { %> <!-- Check if product data exists -->
-    <div>
-      <p><b>Product Name:</b><br> <%= product.productName %></p>
-      <p><b>Product Image:</b><br>
-        <% if (product.image) { %>
-          <img src="/images/<%= product.image %>" class="product-thumb" alt="<%= product.productName %>">
+<style>
+  .page-shell { max-width: 960px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 24px; }
+  .helper-text { color: #6b7280; }
+  .product-thumb.lg { width: 140px; height: 140px; object-fit: contain; }
+</style>
+
+<div class="page-shell">
+  <div class="panel">
+    <div class="d-flex justify-content-between flex-wrap gap-3 mb-3">
+      <div>
+        <h2 class="mb-0">Product Details</h2>
+        <div class="helper-text">Viewing as <%= user.displayName || user.username || user.email %> (<%= user.role %>)</div>
+      </div>
+      <div class="d-flex gap-2">
+        <% if (user.role === "admin") { %>
+          <a class="btn btn-outline-primary" href="/updateProduct/<%= product ? product.id : '' %>">Edit</a>
+          <a class="btn btn-secondary" href="/inventory">Back to Inventory</a>
         <% } else { %>
-          <span class="text-muted">No image</span>
+          <a class="btn btn-secondary btn-sm d-inline-flex align-items-center justify-content-center px-3 py-1 text-white" href="/shopping" style="font-size: 0.95rem;">Back to Shopping</a>
         <% } %>
-      </p>
-      <p><b>Product Quantity:</b><br> <%= product.quantity %></p>
-      <p><b>Price:</b><br> $<%= product.price.toFixed(2) %></p> 
+      </div>
     </div>
-  <% } else { %>
-    <p>No product found.</p>
-  <% } %>
-  <% if (user.role === "admin") { %>
-    <a href="/inventory">Back</a>
-  <% } else { %>
-    <a href="/shopping">Back</a>
-  <% } %>
+
+    <% if (product) { %>
+      <div class="row g-4 align-items-center">
+        <div class="col-md-4 text-center">
+          <% if (product.image) { %>
+            <img src="/images/<%= product.image %>" class="product-thumb lg" alt="<%= product.productName %>">
+          <% } else { %>
+            <div class="text-muted">No image</div>
+          <% } %>
+        </div>
+        <div class="col-md-8">
+          <h4 class="mb-2"><%= product.productName %></h4>
+          <p class="mb-2"><span class="text-muted">Category:</span> <%= product.category || 'Uncategorized' %></p>
+          <p class="mb-2"><span class="text-muted">Quantity:</span> <%= product.quantity %></p>
+          <p class="mb-3"><span class="text-muted">Price:</span> $<%= product.price.toFixed(2) %></p>
+          <% if (user.role !== 'admin') { %>
+            <form class="d-flex gap-2" action="/cart/add/<%= product.id %>" method="POST">
+              <input type="number" name="quantity" class="form-control" min="1" value="1" style="max-width: 120px;">
+              <button type="submit" class="btn btn-primary">Add to Cart</button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+    <% } else { %>
+      <p class="mb-0">No product found.</p>
+    <% } %>
+  </div>
 </div>
 
 <%- include('partials/footer') %>

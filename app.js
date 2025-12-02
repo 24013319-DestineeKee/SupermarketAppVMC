@@ -244,7 +244,7 @@ app.get('/addProduct', checkAuthenticated, checkAdmin, (req, res) => res.render(
 app.post('/addProduct', checkAuthenticated, checkAdmin, upload.single('image'), (req, res) => {
   const { name, quantity, price, category, customCategory } = req.body;
   const chosenCategory = (category === 'Other' ? (customCategory || '') : category) || 'Uncategorized';
-  const image = req.file ? req.file.filename : null;
+  const image = req.file ? req.file.filename : '';
   const product = { productName: name, quantity: Number(quantity), price: Number(price), image, category: chosenCategory || null };
   ProductModel.addProduct(product, (err) => {
     if (err) return res.status(500).send('Error adding product');
@@ -265,7 +265,7 @@ app.post('/updateProduct/:id', checkAuthenticated, checkAdmin, upload.single('im
   const id = parseInt(req.params.id, 10);
   const { name, quantity, price, currentImage, category, customCategory } = req.body;
   const chosenCategory = (category === 'Other' ? (customCategory || '') : category) || 'Uncategorized';
-  const image = req.file ? req.file.filename : (currentImage || null);
+  const image = req.file ? req.file.filename : (currentImage || '');
   const product = { productName: name, quantity: Number(quantity), price: Number(price), image, category: chosenCategory || null };
   ProductModel.updateProduct(id, product, (err) => {
     if (err) return res.status(500).send('Error updating product');

@@ -7,33 +7,45 @@
   ]
 }) %>
 
-<div class="container">
-  <h1 class="mt-5">Login</h1>
-  <% if (errors && errors.length > 0) { %>
-    <div class="alert alert-danger">
-      <% errors.forEach(function(error) { %>
-        <p><%= error %></p>
-      <% }); %>
-    </div>
-  <% } %>
-  <% if (messages && messages.length > 0) { %>
-    <div class="alert alert-success">
-      <% messages.forEach(function(message) { %>
-        <p><%= message %></p>
-      <% }); %>
-    </div>
-  <% } %>
-  <form action="/login" method="POST" class="mt-4">
-    <div class="form-group">
-      <label for="email">Email:</label>
-      <input type="email" id="email" name="email" class="form-control" required>
-    </div>
-    <div class="form-group">
-      <label for="password">Password:</label>
-      <input type="password" id="password" name="password" class="form-control" required>
-    </div>
-    <button type="submit" class="btn btn-primary">Login</button>
-  </form>
+<style>
+  .page-shell { max-width: 480px; margin: 48px auto 64px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 28px; }
+  .helper-text { color: #6b7280; }
+</style>
+
+<div class="page-shell">
+  <div class="panel">
+    <h1 class="mb-2">Login</h1>
+    <p class="helper-text mb-3">Access your account to continue shopping or managing inventory.</p>
+    <% if (errors && errors.length > 0) { %>
+      <div class="alert alert-danger">
+        <% errors.forEach(function(error) { %>
+          <div><%= error %></div>
+        <% }); %>
+      </div>
+    <% } %>
+    <% if (messages && messages.length > 0) { %>
+      <div class="alert alert-success">
+        <% messages.forEach(function(message) { %>
+          <div><%= message %></div>
+        <% }); %>
+      </div>
+    <% } %>
+    <form action="/login" method="POST" class="mt-3">
+      <div class="mb-3">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" id="email" name="email" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input type="password" id="password" name="password" class="form-control" required>
+      </div>
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary">Login</button>
+        <a class="btn btn-outline-secondary" href="/register">Create an account</a>
+      </div>
+    </form>
+  </div>
 </div>
 
 <%- include('partials/footer') %>
