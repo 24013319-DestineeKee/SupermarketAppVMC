@@ -137,6 +137,67 @@ app.get('/login', (req, res) => {
   res.render('login', { messages: req.flash('success'), errors: req.flash('error') });
 });
 
+// Profile (user self-service)
+app.get('/profile', checkAuthenticated, (req, res) => {
+  UserModel.getUserById(req.session.user.id, (err, profileUser) => {
+    if (err) {
+      console.error('DB error:', err);
+      req.flash('error', 'Unable to load profile.');
+      return res.redirect('/shopping');
+    }
+    if (!profileUser) {
+      req.flash('error', 'User not found.');
+      return res.redirect('/logout');
+    }
+    res.render('profile', { user: req.session.user, profileUser });
+  });
+});
+
+app.post('/profile', checkAuthenticated, (req, res) => {
+  const id = req.session.user.id;
+  const { username, email, password, address, contact } = req.body;
+
+  if (!username || !email) {
+    req.flash('error', 'Username and email are required.');
+    return res.redirect('/profile');
+  }
+
+  UserModel.getUserById(id, (findErr, existing) => {
+    if (findErr || !existing) {
+      if (findErr) console.error('DB error:', findErr);
+      req.flash('error', 'User not found.');
+      return res.redirect('/logout');
+    }
+
+    const updated = {
+      username,
+      email,
+      password: password ? crypto.createHash('sha1').update(password).digest('hex') : existing.password,
+      address: address || '',
+      contact: contact || '',
+      role: existing.role
+    };
+
+    UserModel.updateUser(id, updated, (err) => {
+      if (err) {
+        console.error('DB error:', err);
+        req.flash('error', 'Unable to update profile.');
+        return res.redirect('/profile');
+      }
+      UserModel.getUserById(id, (refreshErr, freshUser) => {
+        if (refreshErr || !freshUser) {
+          if (refreshErr) console.error('DB error:', refreshErr);
+          req.flash('success', 'Profile updated.');
+          return res.redirect('/profile');
+        }
+        req.session.user = enrichUser(freshUser);
+        req.flash('success', 'Profile updated.');
+        res.redirect('/profile');
+      });
+    });
+  });
+});
+
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -471,8 +532,8 @@ app.post('/users/:id/delete', checkAuthenticated, checkAdmin, (req, res) => {
 // Users (RESTful API)
 app.get('/api/users', UserController.listUsers);
 app.get('/api/users/:id', UserController.getUser);
-app.post('/api/users', upload.single('image'), UserController.createUser); // optional file in req.file
-app.put('/api/users/:id', upload.single('image'), UserController.updateUser);
+app.post('/api/users', UserController.createUser);
+app.put('/api/users/:id', UserController.updateUser);
 app.delete('/api/users/:id', UserController.deleteUser);
 
 // Products (RESTful API)
