@@ -41,12 +41,12 @@
             <option value="Frozen Foods" <%= product.category === 'Frozen Foods' ? 'selected' : '' %>>Frozen Foods</option>
             <option value="Snacks & Confectionery" <%= product.category === 'Snacks & Confectionery' ? 'selected' : '' %>>Snacks & Confectionery</option>
             <option value="Household & Cleaning" <%= product.category === 'Household & Cleaning' ? 'selected' : '' %>>Household & Cleaning</option>
-            <option value="Health & Beauty / Personal Care" <%= product.category === 'Health & Beauty / Personal Care' ? 'selected' : '' %>>Health & Beauty / Personal Care</option>
-            <option value="Pet Supplies" <%= product.category === 'Pet Supplies' ? 'selected' : '' %>>Pet Supplies</option>
-            <option value="Other" <%= !product.category || product.category === 'Other' ? 'selected' : '' %>>Other (type below)</option>
-          </select>
-          <input type="text" id="customCategory" name="customCategory" class="form-control mt-2" placeholder="Enter category" style="display: <%= (!product.category || product.category === 'Other') ? 'block' : 'none' %>;">
-        </div>
+          <option value="Health & Beauty / Personal Care" <%= product.category === 'Health & Beauty / Personal Care' ? 'selected' : '' %>>Health & Beauty / Personal Care</option>
+          <option value="Pet Supplies" <%= product.category === 'Pet Supplies' ? 'selected' : '' %>>Pet Supplies</option>
+          <option value="Other" <%= !product.category || product.category === 'Other' ? 'selected' : '' %>>Other (type below)</option>
+        </select>
+        <input type="text" id="customCategory" name="customCategory" class="form-control mt-2" placeholder="Enter category" style="<%= (!product.category || product.category === 'Other') ? 'display:block;' : 'display:none;' %>">
+      </div>
 
         <div class="mb-3">
           <label for="quantity" class="form-label">Quantity</label>
