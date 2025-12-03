@@ -45,8 +45,13 @@
           <input class="form-control" type="email" id="email" name="email" value="<%= profileUser.email %>" required>
         </div>
         <div class="mb-3">
+          <label class="form-label" for="currentPassword">Current Password</label>
+          <input class="form-control" type="password" id="currentPassword" name="currentPassword" placeholder="Enter current password to confirm changes" required>
+        </div>
+        <div class="mb-3">
           <label class="form-label" for="password">New Password (optional)</label>
           <input class="form-control" type="password" id="password" name="password" placeholder="Leave blank to keep current password">
+          <div class="form-text">Must be at least 6 characters if provided.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="address">Address</label>

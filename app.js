@@ -155,10 +155,14 @@ app.get('/profile', checkAuthenticated, (req, res) => {
 
 app.post('/profile', checkAuthenticated, (req, res) => {
   const id = req.session.user.id;
-  const { username, email, password, address, contact } = req.body;
+  const { username, email, password, address, contact, currentPassword } = req.body;
 
-  if (!username || !email) {
-    req.flash('error', 'Username and email are required.');
+  if (!username || !email || !address || !contact || !currentPassword) {
+    req.flash('error', 'Username, email, address, contact, and current password are required.');
+    return res.redirect('/profile');
+  }
+  if (password && password.length < 6) {
+    req.flash('error', 'New password should be at least 6 characters.');
     return res.redirect('/profile');
   }
 
@@ -167,6 +171,12 @@ app.post('/profile', checkAuthenticated, (req, res) => {
       if (findErr) console.error('DB error:', findErr);
       req.flash('error', 'User not found.');
       return res.redirect('/logout');
+    }
+
+    const currentHashed = crypto.createHash('sha1').update(currentPassword).digest('hex');
+    if (currentHashed !== existing.password) {
+      req.flash('error', 'Current password is incorrect.');
+      return res.redirect('/profile');
     }
 
     const updated = {
