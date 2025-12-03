@@ -17,8 +17,15 @@
   <div class="panel">
     <h1 class="mb-2">Create Account</h1>
     <p class="helper-text mb-3">Register to start shopping and track your orders.</p>
-    <% if (messages && messages.length > 0) { %>
+    <% if (errors && errors.length > 0) { %>
       <div class="alert alert-danger">
+        <% errors.forEach(function(message) { %>
+          <div><%= message %></div>
+        <% }); %>
+      </div>
+    <% } %>
+    <% if (messages && messages.length > 0) { %>
+      <div class="alert alert-success">
         <% messages.forEach(function(message) { %>
           <div><%= message %></div>
         <% }); %>

@@ -80,22 +80,6 @@ const checkAdmin = (req, res, next) => {
   res.redirect('/shopping');
 };
 
-// --- validation middleware for register ---
-const validateRegistration = (req, res, next) => {
-  const { username, email, password, address, contact } = req.body;
-  if (!username || !email || !password || !address || !contact) {
-    req.flash('error', 'All fields are required.');
-    req.flash('formData', req.body);
-    return res.redirect('/register');
-  }
-  if (password.length < 6) {
-    req.flash('error', 'Password should be at least 6 characters');
-    req.flash('formData', req.body);
-    return res.redirect('/register');
-  }
-  next();
-};
-
 // ----------------- View routes (render pages / redirect flows) -----------------
 
 app.get('/', (req, res) => res.render('index', { user: req.session.user }));
@@ -113,11 +97,36 @@ app.get('/inventory', checkAuthenticated, checkAdmin, (req, res) => {
 
 // Register / Login (view flows) - keep form handling here to allow hashing + redirect UX
 app.get('/register', (req, res) => {
-  res.render('register', { messages: req.flash('error'), formData: req.flash('formData')[0] });
+  res.render('register', {
+    messages: req.flash('success') || [],
+    errors: req.flash('error') || [],
+    formData: req.flash('formData')[0] || {}
+  });
 });
 
-app.post('/register', validateRegistration, (req, res) => {
+app.post('/register', (req, res) => {
   const { username, email, password, address, contact } = req.body;
+  const errors = [];
+  if (!username) errors.push('Username is required.');
+  if (!email) {
+    errors.push('Email is required.');
+  } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+    errors.push('A valid email is required (e.g., name@example.com).');
+  }
+  if (!password) errors.push('Password is required.');
+  if (password && password.length < 6) errors.push('Password should be at least 6 characters.');
+  if (!address) errors.push('Address is required.');
+  if (!contact) errors.push('Contact is required.');
+  if (contact && !/^\d{8}$/.test(contact.trim())) errors.push('Contact number must be exactly 8 digits.');
+
+  if (errors.length) {
+    return res.status(400).render('register', {
+      messages: [],
+      errors,
+      formData: { username: username || '', email: email || '', address: address || '', contact: contact || '' }
+    });
+  }
+
   const hashed = crypto.createHash('sha1').update(password).digest('hex');
   const user = { username, email, password: hashed, address, contact, role: 'user' };
 
@@ -125,8 +134,11 @@ app.post('/register', validateRegistration, (req, res) => {
   UserModel.addUser(user, (err) => {
     if (err) {
       console.error('Error adding user:', err);
-      req.flash('error', 'Registration failed');
-      return res.redirect('/register');
+      return res.status(500).render('register', {
+        messages: [],
+        errors: ['Registration failed. Please try again.'],
+        formData: { username, email, address, contact }
+      });
     }
     req.flash('success', 'Registration successful! Please log in.');
     res.redirect('/login');
@@ -134,7 +146,11 @@ app.post('/register', validateRegistration, (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  res.render('login', { messages: req.flash('success'), errors: req.flash('error'), formData: req.flash('formData')[0] });
+  res.render('login', {
+    messages: req.flash('success') || [],
+    errors: req.flash('error') || [],
+    formData: req.flash('formData')[0] || {}
+  });
 });
 
 // Profile (user self-service)
@@ -163,6 +179,10 @@ app.post('/profile', checkAuthenticated, (req, res) => {
   }
   if (password && password.length < 6) {
     req.flash('error', 'New password should be at least 6 characters.');
+    return res.redirect('/profile');
+  }
+  if (contact && !/^\d{8}$/.test(contact.trim())) {
+    req.flash('error', 'Contact number must be exactly 8 digits.');
     return res.redirect('/profile');
   }
 
@@ -210,9 +230,15 @@ app.post('/profile', checkAuthenticated, (req, res) => {
 
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    req.flash('error', 'All fields are required.');
-    return res.redirect('/login');
+  const errors = [];
+  if (!email) {
+    errors.push('Email is required.');
+  } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+    errors.push('A valid email is required (e.g., name@example.com).');
+  }
+  if (!password) errors.push('Password is required.');
+  if (errors.length) {
+    return res.status(400).render('login', { messages: [], errors, formData: { email: email || '' } });
   }
   const hashed = crypto.createHash('sha1').update(password).digest('hex');
 
@@ -220,14 +246,11 @@ app.post('/login', (req, res) => {
   UserModel.getAllUsers((err, users) => {
     if (err) {
       console.error('DB error:', err);
-      req.flash('error', 'Login failed');
-      return res.redirect('/login');
+      return res.status(500).render('login', { messages: [], errors: ['Login failed. Please try again.'], formData: { email } });
     }
     const found = users.find(u => u.email === email && u.password === hashed);
     if (!found) {
-      req.flash('error', 'Invalid email or password.');
-      req.flash('formData', { email });
-      return res.redirect('/login');
+      return res.status(401).render('login', { messages: [], errors: ['Invalid email or password.'], formData: { email } });
     }
     // Preserve the stored username for display.
     req.session.user = found;
