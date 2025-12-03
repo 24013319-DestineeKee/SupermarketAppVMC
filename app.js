@@ -134,7 +134,7 @@ app.post('/register', validateRegistration, (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  res.render('login', { messages: req.flash('success'), errors: req.flash('error') });
+  res.render('login', { messages: req.flash('success'), errors: req.flash('error'), formData: req.flash('formData')[0] });
 });
 
 // Profile (user self-service)
@@ -226,6 +226,7 @@ app.post('/login', (req, res) => {
     const found = users.find(u => u.email === email && u.password === hashed);
     if (!found) {
       req.flash('error', 'Invalid email or password.');
+      req.flash('formData', { email });
       return res.redirect('/login');
     }
     // Preserve the stored username for display.
