@@ -45,7 +45,13 @@
           <option value="Pet Supplies" <%= product.category === 'Pet Supplies' ? 'selected' : '' %>>Pet Supplies</option>
           <option value="Other" <%= !product.category || product.category === 'Other' ? 'selected' : '' %>>Other (type below)</option>
         </select>
-        <input type="text" id="customCategory" name="customCategory" class="form-control mt-2" placeholder="Enter category" style="<%= (!product.category || product.category === 'Other') ? 'display:block;' : 'display:none;' %>">
+        <% const showCustomCategory = !product.category || product.category === 'Other'; %>
+        <input
+          type="text"
+          id="customCategory"
+          name="customCategory"
+          class="form-control mt-2 <%= showCustomCategory ? '' : 'd-none' %>"
+          placeholder="Enter category">
       </div>
 
         <div class="mb-3">
