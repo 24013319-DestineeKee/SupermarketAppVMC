@@ -338,6 +338,11 @@ app.get('/addProduct', checkAuthenticated, checkAdmin, (req, res) => res.render(
 
 app.post('/addProduct', checkAuthenticated, checkAdmin, upload.single('image'), (req, res) => {
   const { name, quantity, price, category, customCategory } = req.body;
+  const priceValid = typeof price === 'string' && /^\d+(\.\d{2})$/.test(price) && Number(price) > 0;
+  if (!priceValid) {
+    req.flash('error', 'Price must be a positive number with exactly 2 decimal places.');
+    return res.redirect('/addProduct');
+  }
   const chosenCategory = (category === 'Other' ? (customCategory || '') : category) || 'Uncategorized';
   const image = req.file ? req.file.filename : '';
   const product = { productName: name, quantity: Number(quantity), price: Number(price), image, category: chosenCategory || null };
@@ -359,6 +364,11 @@ app.get('/updateProduct/:id', checkAuthenticated, checkAdmin, (req, res) => {
 app.post('/updateProduct/:id', checkAuthenticated, checkAdmin, upload.single('image'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { name, quantity, price, currentImage, category, customCategory } = req.body;
+  const priceValid = typeof price === 'string' && /^\d+(\.\d{2})$/.test(price) && Number(price) > 0;
+  if (!priceValid) {
+    req.flash('error', 'Price must be a positive number with exactly 2 decimal places.');
+    return res.redirect(`/updateProduct/${id}`);
+  }
   const chosenCategory = (category === 'Other' ? (customCategory || '') : category) || 'Uncategorized';
   const image = req.file ? req.file.filename : (currentImage || '');
   const product = { productName: name, quantity: Number(quantity), price: Number(price), image, category: chosenCategory || null };
