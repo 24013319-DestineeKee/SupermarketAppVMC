@@ -56,6 +56,13 @@ const enrichUser = (user) => {
   return { ...user, displayName: user.username || user.email };
 };
 
+// normalize price to two decimals; returns null if invalid/<=0
+const normalizePrice = (raw) => {
+  const num = Number.parseFloat(raw);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return Number(num.toFixed(2));
+};
+
 // expose flash messages to all views as `messages`
 app.use((req, res, next) => {
   if (req.session && req.session.user) {
@@ -338,14 +345,14 @@ app.get('/addProduct', checkAuthenticated, checkAdmin, (req, res) => res.render(
 
 app.post('/addProduct', checkAuthenticated, checkAdmin, upload.single('image'), (req, res) => {
   const { name, quantity, price, category, customCategory } = req.body;
-  const priceValid = typeof price === 'string' && /^\d+(\.\d{2})$/.test(price) && Number(price) > 0;
-  if (!priceValid) {
-    req.flash('error', 'Price must be a positive number with exactly 2 decimal places.');
+  const priceNum = normalizePrice(price);
+  if (priceNum == null) {
+    req.flash('error', 'Price must be a positive number.');
     return res.redirect('/addProduct');
   }
   const chosenCategory = (category === 'Other' ? (customCategory || '') : category) || 'Uncategorized';
   const image = req.file ? req.file.filename : '';
-  const product = { productName: name, quantity: Number(quantity), price: Number(price), image, category: chosenCategory || null };
+  const product = { productName: name, quantity: Number(quantity), price: priceNum, image, category: chosenCategory || null };
   ProductModel.addProduct(product, (err) => {
     if (err) return res.status(500).send('Error adding product');
     res.redirect('/inventory');
@@ -364,14 +371,14 @@ app.get('/updateProduct/:id', checkAuthenticated, checkAdmin, (req, res) => {
 app.post('/updateProduct/:id', checkAuthenticated, checkAdmin, upload.single('image'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { name, quantity, price, currentImage, category, customCategory } = req.body;
-  const priceValid = typeof price === 'string' && /^\d+(\.\d{2})$/.test(price) && Number(price) > 0;
-  if (!priceValid) {
-    req.flash('error', 'Price must be a positive number with exactly 2 decimal places.');
+  const priceNum = normalizePrice(price);
+  if (priceNum == null) {
+    req.flash('error', 'Price must be a positive number.');
     return res.redirect(`/updateProduct/${id}`);
   }
   const chosenCategory = (category === 'Other' ? (customCategory || '') : category) || 'Uncategorized';
   const image = req.file ? req.file.filename : (currentImage || '');
-  const product = { productName: name, quantity: Number(quantity), price: Number(price), image, category: chosenCategory || null };
+  const product = { productName: name, quantity: Number(quantity), price: priceNum, image, category: chosenCategory || null };
   ProductModel.updateProduct(id, product, (err) => {
     if (err) return res.status(500).send('Error updating product');
     res.redirect('/inventory');
