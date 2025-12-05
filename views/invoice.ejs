@@ -67,6 +67,12 @@
               </li>
             <% }); %>
           </ul>
+          <% if (typeof discountAmount !== 'undefined' && Number(discountAmount) > 0) { %>
+            <div class="d-flex justify-content-between">
+              <span class="text-muted">Discount</span>
+              <span class="text-success">-$<%= Number(discountAmount).toFixed(2) %></span>
+            </div>
+          <% } %>
           <div class="d-flex justify-content-between">
             <strong>Total</strong>
             <strong>$<%= Number(order.totalAmount || 0).toFixed(2) %></strong>

@@ -479,7 +479,36 @@ app.get('/invoice/:id', checkAuthenticated, (req, res) => {
       contact: req.session.user.contact || ''
     };
 
-    res.render('invoice', { order, orderId: order.id, checkout, user: req.session.user });
+    // Compute discount amount based on items vs total
+    let discountAmount = 0;
+    if (order && order.items && order.items.length) {
+      const subtotal = order.items.reduce((sum, item) => {
+        const price = Number(item.price || 0);
+        const qty = Number(item.quantity || 0);
+        return sum + price * qty;
+      }, 0);
+      const total = Number(order.totalAmount || 0);
+      const diff = subtotal - total;
+      if (diff > 0.009) discountAmount = Number(diff.toFixed(2));
+    }
+
+    const effectiveDiscount = (() => {
+      if (order && order.discountPercent != null) {
+        const percent = Number(order.discountPercent);
+        if (order.items && order.items.length) {
+          const subtotal = order.items.reduce((sum, item) => {
+            const price = Number(item.price || 0);
+            const qty = Number(item.quantity || 0);
+            return sum + price * qty;
+          }, 0);
+          const diff = subtotal * (percent / 100);
+          return Number(diff.toFixed(2));
+        }
+      }
+      return discountAmount || 0;
+    })();
+
+    res.render('invoice', { order, orderId: order.id, checkout, discountAmount: effectiveDiscount, user: req.session.user });
   });
 });
 

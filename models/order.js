@@ -2,7 +2,7 @@ const db = require('../db');
 
 const OrderModel = {
   getAllOrders(callback) {
-    const orderSql = 'SELECT id, userId, totalAmount, status FROM orders';
+    const orderSql = 'SELECT id, userId, totalAmount, discountPercent, status FROM orders';
     db.query(orderSql, (orderErr, orders) => {
       if (orderErr) return callback(orderErr);
       if (!orders.length) return callback(null, []);
@@ -39,7 +39,7 @@ const OrderModel = {
   },
 
   getOrderById(id, callback) {
-    const orderSql = 'SELECT id, userId, totalAmount, status FROM orders WHERE id = ?';
+    const orderSql = 'SELECT id, userId, totalAmount, discountPercent, status FROM orders WHERE id = ?';
     db.query(orderSql, [id], (orderErr, orderResults) => {
       if (orderErr) return callback(orderErr);
       const order = orderResults[0];
@@ -60,7 +60,7 @@ const OrderModel = {
   },
 
   getOrdersByUser(userId, callback) {
-    const orderSql = 'SELECT id, userId, totalAmount, status FROM orders WHERE userId = ?';
+    const orderSql = 'SELECT id, userId, totalAmount, discountPercent, status FROM orders WHERE userId = ?';
     db.query(orderSql, [userId], (orderErr, orders) => {
       if (orderErr) return callback(orderErr);
       if (!orders.length) return callback(null, []);
@@ -97,10 +97,11 @@ const OrderModel = {
     db.beginTransaction((txErr) => {
       if (txErr) return callback(txErr);
 
-      const insertOrderSql = 'INSERT INTO orders (userId, totalAmount, status) VALUES (?, ?, ?)';
+      const insertOrderSql = 'INSERT INTO orders (userId, totalAmount, discountPercent, status) VALUES (?, ?, ?, ?)';
       const orderParams = [
         orderData.userId,
         orderData.totalAmount,
+        orderData.discountPercent || 0,
         orderData.status || 'pending'
       ];
 
@@ -145,16 +146,18 @@ const OrderModel = {
       const updatedOrder = {
         userId: orderData.userId != null ? orderData.userId : existing.userId,
         totalAmount: orderData.totalAmount != null ? orderData.totalAmount : existing.totalAmount,
+        discountPercent: orderData.discountPercent != null ? orderData.discountPercent : existing.discountPercent,
         status: orderData.status != null ? orderData.status : existing.status
       };
 
       db.beginTransaction((txErr) => {
         if (txErr) return callback(txErr);
 
-        const updateSql = 'UPDATE orders SET userId = ?, totalAmount = ?, status = ? WHERE id = ?';
+        const updateSql = 'UPDATE orders SET userId = ?, totalAmount = ?, discountPercent = ?, status = ? WHERE id = ?';
         const params = [
           updatedOrder.userId,
           updatedOrder.totalAmount,
+          updatedOrder.discountPercent != null ? updatedOrder.discountPercent : 0,
           updatedOrder.status,
           id
         ];

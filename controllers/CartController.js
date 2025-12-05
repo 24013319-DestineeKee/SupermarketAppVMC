@@ -129,37 +129,40 @@ const CartController = {
         return res.redirect('/cart');
       }
 
-      const { cart, cartTotal } = mapCartItems(items);
+        const { cart, cartTotal } = mapCartItems(items);
 
-      OrderModel.getOrdersByUser(userId, (orderFetchErr, existingOrders) => {
-        if (orderFetchErr) {
-          console.error('Error checking existing orders:', orderFetchErr);
-          req.flash('error', 'Unable to complete checkout right now.');
-          return res.redirect('/cart');
-        }
+        OrderModel.getOrdersByUser(userId, (orderFetchErr, existingOrders) => {
+          if (orderFetchErr) {
+            console.error('Error checking existing orders:', orderFetchErr);
+            req.flash('error', 'Unable to complete checkout right now.');
+            return res.redirect('/cart');
+          }
 
-        const isFirstOrder = !existingOrders || existingOrders.length === 0;
-        const discountedTotal = isFirstOrder ? Number((cartTotal * 0.75).toFixed(2)) : cartTotal;
+          const isFirstOrder = !existingOrders || existingOrders.length === 0;
+          const discountPercent = isFirstOrder ? 25 : 0;
+          const discountedTotal = discountPercent > 0 ? Number((cartTotal * 0.75).toFixed(2)) : cartTotal;
+          const discountAmount = Math.max(0, Number((cartTotal - discountedTotal).toFixed(2)));
 
-        const orderItems = cart.map((item) => ({
-          productId: item.productId,
-          quantity: Number(item.quantity),
-          price: item.discountedPrice,
-          productName: item.productName,
-          image: item.image
-        }));
+          const orderItems = cart.map((item) => ({
+            productId: item.productId,
+            quantity: Number(item.quantity),
+            price: item.discountedPrice,
+            productName: item.productName,
+            image: item.image
+          }));
 
         const checkoutDetails = {
           fullName: fullName || req.session.user.username || '',
           address: address || req.session.user.address || '',
           contact: contact || req.session.user.contact || '',
           email: email || req.session.user.email || '',
-          discountApplied: isFirstOrder ? '25% first order discount applied' : ''
+          discountApplied: discountPercent > 0 ? '25% first order discount applied' : ''
         };
 
         const payload = {
           userId,
           totalAmount: discountedTotal,
+          discountPercent,
           status: 'processing'
         };
 
@@ -177,6 +180,7 @@ const CartController = {
                 order: orderData,
                 orderId: orderData && orderData.id ? orderData.id : result.orderId,
                 checkout: checkoutDetails,
+                discountAmount,
                 user: req.session.user
               });
             });
