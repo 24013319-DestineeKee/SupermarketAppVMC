@@ -1,0 +1,26 @@
+<%- include('partials/header', {
+  title: 'NETS Payment Error',
+  user,
+  navLinks: [
+    { href: '/cart', label: 'Back to Cart' },
+    { href: '/shopping', label: 'Shopping' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<div class="container" style="max-width: 720px; margin-top: 32px; margin-bottom: 48px;">
+  <div class="alert alert-danger">
+    <h4 class="alert-heading mb-2">Unable to generate NETS QR</h4>
+    <p class="mb-2"><%= errorMsg %></p>
+    <ul class="mb-0">
+      <li>Response code: <%= responseCode %></li>
+      <% if (instructions) { %><li>Instructions: <%= instructions %></li><% } %>
+    </ul>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/checkout">Try again</a>
+    <a class="btn btn-primary" href="/cart">Back to cart</a>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

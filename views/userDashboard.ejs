@@ -1,0 +1,78 @@
+<%- include('partials/header', {
+  title: 'User Dashboard - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/orders', label: 'Orders' },
+    { href: '/users', label: 'Users' },
+    { href: '/inventory', label: 'Inventory' },
+    { href: '/profile', label: 'Profile' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<style>
+  .page-shell { max-width: 1100px; margin: 32px auto 48px; padding: 0 16px; }
+  .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .section-heading .helper-text { margin: 0; color: #6b7280; }
+  .table-card { overflow: hidden; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 10px 26px rgba(16,24,40,0.06); }
+  .table-card thead { background: #f8fafc; font-weight: 600; }
+  .table-card tbody tr:hover { background: #f1f5f9; }
+  .empty-state { text-align: center; padding: 24px; border: 1px dashed #d7dce3; border-radius: 12px; color: #6b7280; background: #fff; }
+</style>
+
+<div class="page-shell">
+  <div class="section-heading mb-3">
+    <div>
+      <h2 class="mb-0">User Dashboard</h2>
+      <p class="helper-text mb-0">View account roles and manage access.</p>
+    </div>
+    <a href="/users" class="btn btn-outline-primary btn-sm">Refresh</a>
+  </div>
+
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+  <% if (messages && messages.success && messages.success.length) { %>
+    <div class="alert alert-success">
+      <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+
+  <% if (!users || !users.length) { %>
+    <div class="empty-state">No users available.</div>
+  <% } else { %>
+    <div class="table-card">
+      <table class="table table-striped align-middle mb-0">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach(function(u){ %>
+            <tr>
+              <td><%= u.id %></td>
+              <td><%= u.username %></td>
+              <td><%= u.email %></td>
+              <td><span class="badge bg-info text-dark text-uppercase"><%= u.role %></span></td>
+              <td class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-secondary" href="/users/<%= u.id %>/edit">Edit</a>
+                <form action="/users/<%= u.id %>/delete" method="POST" onsubmit="return confirm('Delete this user?');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

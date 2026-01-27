@@ -1,0 +1,101 @@
+<%- include('partials/header', {
+  title: 'Invoice - Supermarket App',
+  user,
+  navLinks: user && user.role === 'admin'
+    ? [
+        { href: '/orders', label: 'Orders' },
+        { href: '/users', label: 'Users' },
+        { href: '/inventory', label: 'Inventory' },
+        { href: '/logout', label: 'Logout' }
+      ]
+    : [
+        { href: '/profile', label: 'Profile' },
+        { href: '/my-orders', label: 'My Orders' },
+        { href: '/shopping', label: 'Shopping' },
+        { href: '/cart', label: 'Cart' },
+        { href: '/logout', label: 'Logout' }
+      ]
+}) %>
+
+<style>
+  .page-shell { max-width: 1100px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 24px; }
+  .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .section-heading .helper-text { margin: 0; color: #6b7280; }
+</style>
+
+<div class="page-shell">
+  <div class="section-heading mb-3">
+    <div>
+      <h3 class="mb-0">Invoice</h3>
+      <p class="helper-text mb-0">Order summary and billing details</p>
+    </div>
+    <span class="badge bg-success">Order #<%= (order && order.id) || orderId %></span>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="panel">
+        <h5 class="mb-3">Billing & Delivery</h5>
+        <p class="mb-1"><strong>Name:</strong> <%= checkout.fullName %></p>
+        <p class="mb-1"><strong>Email:</strong> <%= checkout.email %></p>
+        <p class="mb-1"><strong>Address:</strong><br><%= checkout.address || 'N/A' %></p>
+        <p class="mb-0"><strong>Contact:</strong> <%= checkout.contact || 'N/A' %></p>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="panel">
+        <h5 class="mb-3">Order Summary</h5>
+        <% if (!order || !order.items || !order.items.length) { %>
+          <p class="text-muted mb-0">No items available.</p>
+        <% } else { %>
+          <ul class="list-group list-group-flush mb-3">
+            <% order.items.forEach(function(item){ %>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                  <% if (item.image) { %>
+                    <img src="/images/<%= item.image %>" alt="<%= item.productName %>" style="width: 50px;" loading="lazy" onerror="this.classList.add('d-none'); this.insertAdjacentHTML('afterend','<span class=&quot;text-muted&quot;>No image</span>');">
+                  <% } else { %>
+                    <span class="text-muted">No image</span>
+                  <% } %>
+                  <div>
+                    <div class="fw-bold"><%= item.productName %></div>
+                    <small class="text-muted">Qty: <%= item.quantity %> @ $<%= Number(item.price || 0).toFixed(2) %></small>
+                  </div>
+                </div>
+                <span>$<%= (Number(item.price || 0) * Number(item.quantity || 0)).toFixed(2) %></span>
+              </li>
+            <% }); %>
+          </ul>
+          <% if (typeof discountAmount !== 'undefined' && Number(discountAmount) > 0) { %>
+            <div class="d-flex justify-content-between">
+              <span class="text-muted">Discount</span>
+              <span class="text-success">-$<%= Number(discountAmount).toFixed(2) %></span>
+            </div>
+          <% } %>
+          <% if (typeof loyaltyDiscount !== 'undefined' && Number(loyaltyDiscount) > 0) { %>
+            <div class="d-flex justify-content-between">
+              <div>
+                <span class="text-muted">Loyalty discount</span>
+                <% if (typeof loyaltyPoints !== 'undefined') { %>
+                  <div class="small text-muted">(<%= loyaltyPoints %> point<%= loyaltyPoints === 1 ? '' : 's' %>)</div>
+                <% } %>
+              </div>
+              <span class="text-success">-$<%= Number(loyaltyDiscount).toFixed(2) %></span>
+            </div>
+          <% } %>
+          <div class="d-flex justify-content-between">
+            <strong>Total</strong>
+            <strong>$<%= Number(order.totalAmount || 0).toFixed(2) %></strong>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4 text-end">
+    <a class="btn btn-primary" href="/shopping">Continue Shopping</a>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,103 @@
+<%- include('partials/header', {
+  title: 'Update Product - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/orders', label: 'Orders' },
+    { href: '/users', label: 'Users' },
+    { href: '/inventory', label: 'Inventory' },
+    { href: '/addProduct', label: 'Add Product' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<style>
+  .page-shell { max-width: 760px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 24px; }
+  .helper-text { color: #6b7280; }
+</style>
+
+<div class="page-shell">
+  <div class="panel">
+    <h2 class="mb-1">Update Product</h2>
+    <p class="helper-text mb-4">Edit details, adjust category, or replace the image.</p>
+    <% if (product) { %>
+      <form action="/updateProduct/<%= product.id %>" method="POST" enctype="multipart/form-data">
+        
+        <div class="mb-3">
+          <label for="name" class="form-label">Product Name</label>
+          <input type="text" class="form-control" id="name" name="name" value="<%= product.productName %>" required>
+        </div>
+
+        <div class="mb-3">
+          <label for="category" class="form-label">Category</label>
+          <select id="category" name="category" class="form-select" onchange="toggleCustomCategory(this.value)" required>
+            <option value="">Select a category</option>
+            <option value="Produce (Fruits & Vegetables)" <%= product.category === 'Produce (Fruits & Vegetables)' ? 'selected' : '' %>>Produce (Fruits & Vegetables)</option>
+            <option value="Meat & Seafood" <%= product.category === 'Meat & Seafood' ? 'selected' : '' %>>Meat & Seafood</option>
+            <option value="Dairy & Eggs" <%= product.category === 'Dairy & Eggs' ? 'selected' : '' %>>Dairy & Eggs</option>
+            <option value="Bakery" <%= product.category === 'Bakery' ? 'selected' : '' %>>Bakery</option>
+            <option value="Pantry (Dry Goods, Canned, Condiments, Pasta/Rice)" <%= product.category === 'Pantry (Dry Goods, Canned, Condiments, Pasta/Rice)' ? 'selected' : '' %>>Pantry (Dry Goods, Canned, Condiments, Pasta/Rice)</option>
+            <option value="Beverages (Water, Juice, Soda, Tea/Coffee)" <%= product.category === 'Beverages (Water, Juice, Soda, Tea/Coffee)' ? 'selected' : '' %>>Beverages (Water, Juice, Soda, Tea/Coffee)</option>
+            <option value="Frozen Foods" <%= product.category === 'Frozen Foods' ? 'selected' : '' %>>Frozen Foods</option>
+            <option value="Snacks & Confectionery" <%= product.category === 'Snacks & Confectionery' ? 'selected' : '' %>>Snacks & Confectionery</option>
+            <option value="Household & Cleaning" <%= product.category === 'Household & Cleaning' ? 'selected' : '' %>>Household & Cleaning</option>
+          <option value="Health & Beauty / Personal Care" <%= product.category === 'Health & Beauty / Personal Care' ? 'selected' : '' %>>Health & Beauty / Personal Care</option>
+          <option value="Pet Supplies" <%= product.category === 'Pet Supplies' ? 'selected' : '' %>>Pet Supplies</option>
+          <option value="Other" <%= !product.category || product.category === 'Other' ? 'selected' : '' %>>Other (type below)</option>
+        </select>
+        <% const showCustomCategory = !product.category || product.category === 'Other'; %>
+        <input
+          type="text"
+          id="customCategory"
+          name="customCategory"
+          class="form-control mt-2 <%= showCustomCategory ? '' : 'd-none' %>"
+          placeholder="Enter category">
+      </div>
+
+        <div class="mb-3">
+          <label for="quantity" class="form-label">Quantity</label>
+          <input type="number" class="form-control" id="quantity" name="quantity" min="0" step="1" value="<%= product.quantity %>" required>
+        </div>
+
+        <div class="mb-3">
+          <label for="price" class="form-label">Price</label>
+          <input type="number" class="form-control" id="price" name="price" min="0" step="0.01" value="<%= product.price %>" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Current Image</label>
+          <input type="hidden" name="currentImage" value="<%= product.image %>">
+          <div class="border rounded p-2 d-inline-block">
+            <% if (product.image) { %>
+              <img src="/images/<%= product.image %>" class="product-thumb" alt="<%= product.productName %>">
+            <% } else { %>
+              <span class="text-muted">No image</span>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="image" class="form-label">Upload New Image</label>
+          <input class="form-control" type="file" id="image" name="image" accept="image/*">
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn btn-primary">Update Product</button>
+          <a href="/inventory" class="btn btn-secondary">Back to Inventory</a>
+        </div>
+      </form>
+    <% } else { %>
+      <p class="text-center mb-0">No product found.</p>
+    <% } %>
+  </div>
+</div>
+
+<script>
+  function toggleCustomCategory(value) {
+    const custom = document.getElementById('customCategory');
+    custom.style.display = value === 'Other' ? 'block' : 'none';
+    if (value !== 'Other') custom.value = '';
+  }
+</script>
+
+<%- include('partials/footer') %>

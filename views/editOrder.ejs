@@ -1,0 +1,61 @@
+<%- include('partials/header', {
+  title: (order ? 'Edit Order' : 'New Order') + ' - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/orders', label: 'Orders' },
+    { href: '/users', label: 'Users' },
+    { href: '/inventory', label: 'Inventory' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<style>
+  .page-shell { max-width: 760px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 24px; }
+  .helper-text { color: #6b7280; }
+</style>
+
+<div class="page-shell">
+  <div class="panel">
+    <h2 class="mb-1"><%= order ? 'Edit Order' : 'New Order' %></h2>
+    <p class="helper-text mb-4">Adjust the owner, totals, or status.</p>
+
+    <% if (messages && messages.error && messages.error.length) { %>
+      <div class="alert alert-danger">
+        <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+      </div>
+    <% } %>
+    <% if (messages && messages.success && messages.success.length) { %>
+      <div class="alert alert-success">
+        <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+      </div>
+    <% } %>
+
+    <form action="<%= order ? '/orders/' + order.id + '/edit' : '/orders/new' %>" method="POST">
+      <div class="mb-3">
+        <label class="form-label" for="userId">User ID</label>
+        <input class="form-control" type="number" id="userId" name="userId" min="1" value="<%= order ? order.userId : '' %>" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="totalAmount">Total Amount</label>
+        <input class="form-control" type="number" id="totalAmount" name="totalAmount" step="0.01" min="0" value="<%= order ? order.totalAmount : '' %>">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="status">Status</label>
+        <select class="form-select" id="status" name="status">
+          <% const currentStatus = order ? order.status : 'pending'; %>
+          <option value="pending" <%= currentStatus === 'pending' ? 'selected' : '' %>>Pending</option>
+          <option value="processing" <%= currentStatus === 'processing' ? 'selected' : '' %>>Processing</option>
+          <option value="completed" <%= currentStatus === 'completed' ? 'selected' : '' %>>Completed</option>
+          <option value="cancelled" <%= currentStatus === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+        </select>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><%= order ? 'Save Changes' : 'Create Order' %></button>
+        <a href="/orders" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

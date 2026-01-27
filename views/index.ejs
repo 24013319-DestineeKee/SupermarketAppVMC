@@ -1,0 +1,56 @@
+<%- include('partials/header', {
+  title: 'Supermarket App',
+  user,
+  navLinks: user
+    ? [
+        { href: '/profile', label: 'Profile' },
+        { href: '/logout', label: 'Logout' }
+      ]
+    : [
+        { href: '/register', label: 'Register' },
+        { href: '/login', label: 'Login' }
+      ]
+}) %>
+
+<style>
+  .page-shell { max-width: 920px; margin: 32px auto 48px; padding: 0 16px; }
+  .hero-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 16px 36px rgba(16, 24, 40, 0.08);
+    padding: 32px;
+    text-align: center;
+  }
+  .hero-title { font-size: 1.9rem; font-weight: 700; margin-bottom: 12px; }
+  .hero-sub { color: #6b7280; font-size: 1rem; margin-bottom: 18px; }
+  .cta-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+</style>
+
+<div class="page-shell">
+  <div class="hero-card">
+    <div class="hero-title">Supermarket App</div>
+    <div class="hero-sub">Fresh groceries, simple checkout, clear dashboards.</div>
+    <% if (user) { %>
+      <% if (user.role === "admin") { %>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="/inventory">Go to Inventory</a>
+          <a class="btn btn-outline-secondary" href="/orders">Manage Orders</a>
+        </div>
+      <% } else { %>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="/shopping">Continue Shopping</a>
+          <a class="btn btn-outline-secondary" href="/my-orders">View My Orders</a>
+        </div>
+      <% } %>
+    <% } else { %>
+      <div class="hero-sub">Please log in or create an account to start shopping.</div>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/login">Login</a>
+        <a class="btn btn-outline-secondary" href="/register">Register</a>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

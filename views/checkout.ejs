@@ -1,0 +1,384 @@
+<%- include('partials/header', {
+  title: 'Checkout - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/profile', label: 'Profile' },
+    { href: '/my-orders', label: 'My Orders' },
+    { href: '/cart', label: 'Back to Cart' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<style>
+  .page-shell { max-width: 1180px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 24px; }
+  .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .section-heading .helper-text { margin: 0; color: #6b7280; }
+  .summary-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+  #stripe-element { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
+</style>
+
+<div class="page-shell">
+  <div class="section-heading mb-3">
+    <div>
+      <h2 class="mb-0">Checkout</h2>
+      <p class="helper-text mb-0">Confirm your details and place your order.</p>
+    </div>
+    <a class="btn btn-outline-primary btn-sm" href="/cart">Back to cart</a>
+  </div>
+
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+  <% if (discountEligible) { %>
+    <div class="alert alert-success">25% first-order discount will be applied at checkout.</div>
+  <% } %>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="panel">
+        <h4 class="mb-3">Payment & Delivery</h4>
+        <div id="checkout-alert" class="alert alert-danger d-none"></div>
+        <form id="checkout-form" onsubmit="return false;">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="fullName">Full Name</label>
+              <input type="text" id="fullName" name="fullName" class="form-control" placeholder="Mary Tan" value="<%= (formData && formData.fullName) || (user && user.username) || '' %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="email">Email</label>
+              <input type="email" id="email" name="email" class="form-control" placeholder="mary@mary.com" value="<%= (formData && formData.email) || (user && user.email) || '' %>">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="address">Delivery Address</label>
+            <textarea id="address" name="address" class="form-control" rows="3" placeholder="123 Main St, City, Country"><%= (formData && formData.address) || (user && user.address) || '' %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="contact">Contact Number</label>
+            <input type="text" id="contact" name="contact" class="form-control" placeholder="+1 234 567 8900" value="<%= (formData && formData.contact) || (user && user.contact) || '' %>">
+          </div>
+          <% if (membership) { %>
+            <div class="border rounded-3 p-3 mt-3">
+              <div class="d-flex flex-wrap justify-content-between align-items-end gap-2">
+                <div>
+                  <h6 class="mb-1">Use loyalty points</h6>
+                  <div class="small text-muted">Redeem points to reduce this payment.</div>
+                </div>
+                <div class="text-end">
+                  <div class="fw-bold"><%= availablePoints %> pts</div>
+                  <div class="small text-muted">â‰ˆ $<%= (availablePoints / 10).toFixed(2) %> available</div>
+                </div>
+              </div>
+              <form class="row row-cols-auto g-2 align-items-end mt-2" action="/membership/redeem" method="POST">
+                <div class="col">
+                  <label class="form-label mb-1" for="redeemPoints">Points to redeem</label>
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="redeemPoints"
+                    name="points"
+                    min="1"
+                    step="1"
+                    max="<%= maxRedeemablePoints %>"
+                    value="<%= redemptionPoints > 0 ? redemptionPoints : (maxRedeemablePoints || '') %>"
+                    placeholder="Points">
+                </div>
+                <div class="col">
+                  <button type="submit" name="action" value="apply" class="btn btn-primary w-100" <%= maxRedeemablePoints < 1 ? 'disabled' : '' %>>Apply discount</button>
+                </div>
+                <% if (redemptionPoints > 0) { %>
+                  <div class="col">
+                    <button type="submit" name="action" value="clear" class="btn btn-link text-decoration-none">Clear</button>
+                  </div>
+                <% } %>
+              </form>
+              <% if (maxRedeemablePoints > 0) { %>
+                <div class="small text-muted mt-2">Up to <%= maxRedeemablePoints %> point<%= maxRedeemablePoints === 1 ? '' : 's' %> can be used for this payment.</div>
+              <% } else { %>
+                <div class="small text-muted mt-2">No redeemable points available for this payment amount.</div>
+              <% } %>
+              <% if (redemptionPoints > 0) { %>
+                <div class="small text-muted">Applying <%= redemptionPoints %> point<%= redemptionPoints === 1 ? '' : 's' %> (â‰ˆ $<%= (redemptionPoints / 10).toFixed(2) %>).</div>
+              <% } %>
+            </div>
+          <% } %>
+          <div class="mt-3">
+            <div class="mb-3">
+              <p class="text-muted small mb-2">Pay by card securely with Stripe.</p>
+              <% if (stripePublishableKey) { %>
+                <div id="stripe-element" class="d-none"></div>
+                <div id="stripe-error" class="alert alert-danger d-none mt-2"></div>
+                <div class="small text-muted mt-2" id="stripe-note">Click below to load the card form.</div>
+                <button type="button" id="stripe-pay-btn" class="btn btn-dark w-100 mt-2">Pay with Card</button>
+              <% } else { %>
+                <div class="alert alert-warning mb-0">Stripe is not configured. Please contact support.</div>
+              <% } %>
+            </div>
+            <p class="text-muted small mb-2">You will be redirected to PayPal to pay securely.</p>
+            <div id="paypal-button-container"></div>
+          </div>
+        </form>
+        <div class="mt-3">
+          <form id="nets-form" action="/nets/qr" method="POST">
+            <button type="submit" class="btn btn-outline-secondary w-100">Pay with NETS QR</button>
+          </form>
+          <div class="small text-muted mt-2">Generates a NETS QR code for the same amount (with discounts applied if eligible).</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="panel">
+        <h4 class="mb-3">Order Summary</h4>
+        <% if (!cart || cart.length === 0) { %>
+          <p class="text-muted mb-0">Your cart is empty.</p>
+        <% } else { %>
+          <ul class="list-group list-group-flush mb-3">
+            <% cart.forEach(function(item){ %>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="fw-bold"><%= item.productName %></div>
+                  <small class="text-muted">Qty: <%= item.quantity %> @ $<%= item.unitPrice.toFixed(2) %></small>
+                </div>
+                <span>$<%= item.lineTotal.toFixed(2) %></span>
+              </li>
+            <% }); %>
+          </ul>
+          <div class="summary-line">
+            <strong>Subtotal</strong>
+            <strong>$<%= cartTotal.toFixed(2) %></strong>
+          </div>
+          <% if (discountEligible) { %>
+            <div class="summary-line text-success">
+              <strong><%= discountPercent %>% first-order discount</strong>
+              <strong>-$<%= (cartTotal - discountedTotal).toFixed(2) %></strong>
+            </div>
+            <div class="summary-line">
+              <strong>After discount</strong>
+              <strong>$<%= discountedTotal.toFixed(2) %></strong>
+            </div>
+          <% } %>
+          <% if (typeof loyaltyDiscount !== 'undefined' && loyaltyDiscount > 0) { %>
+            <div class="summary-line text-warning">
+              <div>
+                <strong>Loyalty discount</strong>
+                <% if (loyaltyPoints > 0) { %>
+                  <div class="small text-muted">Redeeming <%= loyaltyPoints %> point<%= loyaltyPoints === 1 ? '' : 's' %></div>
+                <% } %>
+              </div>
+              <strong>-$<%= loyaltyDiscount.toFixed(2) %></strong>
+            </div>
+          <% } %>
+          <div class="summary-line border-top pt-2">
+            <strong>Total</strong>
+            <strong>$<%= payableTotal.toFixed(2) %></strong>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (paypalClientId) { %>
+<script src="https://www.paypal.com/sdk/js?client-id=<%= paypalClientId %>&currency=SGD"></script>
+<% } %>
+<% if (stripePublishableKey) { %>
+<script src="https://js.stripe.com/v3/"></script>
+<% } %>
+<script>
+  (() => {
+    const clientId = '<%= paypalClientId %>';
+    const alertBox = document.getElementById('checkout-alert');
+    const stripePublishableKey = '<%= stripePublishableKey %>';
+    const showError = (msg) => {
+      if (!alertBox) return;
+      alertBox.textContent = msg;
+      alertBox.classList.remove('d-none');
+    };
+    const clearError = () => {
+      if (alertBox) alertBox.classList.add('d-none');
+    };
+    const payloadFromForm = () => ({
+      fullName: document.getElementById('fullName')?.value.trim() || '',
+      email: document.getElementById('email')?.value.trim() || '',
+      address: document.getElementById('address')?.value.trim() || '',
+      contact: document.getElementById('contact')?.value.trim() || ''
+    });
+
+    const stripeError = document.getElementById('stripe-error');
+    const stripeNote = document.getElementById('stripe-note');
+    const stripeButton = document.getElementById('stripe-pay-btn');
+    const stripeElementHost = document.getElementById('stripe-element');
+    let stripe = null;
+    let stripeElements = null;
+    let stripeClientSecret = null;
+    let paymentElement = null;
+
+    const showStripeError = (msg) => {
+      if (!stripeError) return;
+      stripeError.textContent = msg;
+      stripeError.classList.remove('d-none');
+    };
+    const clearStripeError = () => {
+      if (stripeError) stripeError.classList.add('d-none');
+    };
+    const setStripeBusy = (busy) => {
+      if (!stripeButton) return;
+      stripeButton.disabled = !!busy;
+      stripeButton.textContent = busy ? 'Processing...' : (stripeClientSecret ? 'Confirm Card Payment' : 'Pay with Card');
+    };
+
+    const initStripeElements = async () => {
+      if (!stripePublishableKey || !stripeButton || !stripeElementHost) return;
+      if (!stripe) stripe = Stripe(stripePublishableKey);
+      clearStripeError();
+      setStripeBusy(true);
+      const payload = payloadFromForm();
+      const res = await fetch('/api/stripe/create-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error || !data.clientSecret) {
+        throw new Error(data.error || 'Unable to start Stripe payment.');
+      }
+      stripeClientSecret = data.clientSecret;
+      stripeElements = stripe.elements({ clientSecret: stripeClientSecret });
+      paymentElement = stripeElements.create('payment');
+      stripeElementHost.classList.remove('d-none');
+      paymentElement.mount('#stripe-element');
+      if (stripeNote) stripeNote.textContent = 'Enter your card details, then click Confirm Card Payment.';
+      setStripeBusy(false);
+    };
+
+    const confirmStripePayment = async () => {
+      if (!stripe || !stripeElements) return;
+      clearStripeError();
+      setStripeBusy(true);
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements: stripeElements,
+        confirmParams: {
+          return_url: window.location.origin + '/checkout'
+        },
+        redirect: 'if_required'
+      });
+      if (error) {
+        showStripeError(error.message || 'Unable to confirm card payment.');
+        setStripeBusy(false);
+        return;
+      }
+      if (!paymentIntent || !paymentIntent.id) {
+        showStripeError('Payment intent not returned. Please try again.');
+        setStripeBusy(false);
+        return;
+      }
+      const completeRes = await fetch('/api/stripe/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentIntentId: paymentIntent.id })
+      });
+      const completeBody = await completeRes.json().catch(() => ({}));
+      if (!completeRes.ok || completeBody.error) {
+        showStripeError(completeBody.error || 'Unable to finalize payment.');
+        setStripeBusy(false);
+        return;
+      }
+      window.location.href = completeBody.redirectUrl || `/invoice/${completeBody.orderId}`;
+    };
+
+    if (stripeButton) {
+      stripeButton.addEventListener('click', async () => {
+        try {
+          if (!stripeClientSecret) {
+            await initStripeElements();
+            setStripeBusy(false);
+            return;
+          }
+          await confirmStripePayment();
+        } catch (err) {
+          showStripeError(err.message || 'Unable to start Stripe payment.');
+          setStripeBusy(false);
+        }
+      });
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const redirectedPaymentIntent = params.get('payment_intent');
+    if (stripePublishableKey && redirectedPaymentIntent && stripeButton) {
+      fetch('/api/stripe/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentIntentId: redirectedPaymentIntent })
+      })
+        .then(async (res) => {
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok || body.error) {
+            throw new Error(body.error || 'Unable to finalize Stripe payment.');
+          }
+          window.location.href = body.redirectUrl || `/invoice/${body.orderId}`;
+        })
+        .catch((err) => {
+          showStripeError(err.message || 'Stripe payment needs attention. Please try again.');
+        });
+    }
+
+    if (clientId) {
+      if (typeof paypal === 'undefined') {
+        showError('PayPal script failed to load. Please refresh and try again.');
+        return;
+      }
+      paypal.Buttons({
+        style: { shape: 'rect', color: 'gold', layout: 'vertical', label: 'paypal' },
+        createOrder: function () {
+          clearError();
+          const payload = payloadFromForm();
+          return fetch('/api/paypal/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+            .then(async (res) => {
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || data.error) {
+                throw new Error(data.error || 'Unable to start PayPal payment.');
+              }
+              return data.orderID;
+            })
+            .catch((err) => {
+              showError(err.message || 'Unable to start PayPal payment.');
+              throw err;
+            });
+        },
+        onApprove: function (data) {
+          clearError();
+          return fetch('/api/paypal/capture-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderID: data.orderID })
+          })
+            .then(async (res) => {
+              const body = await res.json().catch(() => ({}));
+              if (!res.ok || body.error) {
+                throw new Error(body.error || 'Unable to capture PayPal payment.');
+              }
+              window.location.href = body.redirectUrl || `/invoice/${body.orderId}`;
+            })
+            .catch((err) => {
+              showError(err.message || 'Unable to complete payment.');
+            });
+        },
+        onError: function (err) {
+          showError('PayPal error: ' + (err && err.message ? err.message : 'Please try again.'));
+        }
+      }).render('#paypal-button-container');
+    } else if (!stripePublishableKey) {
+      showError('PayPal is not configured. Please contact support.');
+    }
+  })();
+</script>
+
+<%- include('partials/footer') %>

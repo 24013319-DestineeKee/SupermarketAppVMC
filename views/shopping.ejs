@@ -1,0 +1,198 @@
+<%- include('partials/header', {
+  title: 'Shopping - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/profile', label: 'Profile' },
+    { href: '/my-orders', label: 'My Orders' },
+    { href: '/cart', label: 'View Cart' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<style>
+  .page-shell { max-width: 1200px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 20px; }
+  .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .section-heading .helper-text { margin: 0; color: #6b7280; }
+  .table-card { overflow: hidden; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 10px 26px rgba(16,24,40,0.06); }
+  .table-card thead { background: #f8fafc; font-weight: 600; }
+  .table-card tbody tr:hover { background: #f1f5f9; }
+  .filter-chip { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+  .product-thumb.lg { width: 110px; height: 110px; object-fit: contain; }
+</style>
+
+<div class="page-shell">
+  <div class="section-heading">
+    <div>
+      <h2 class="mb-0">Shop Products</h2>
+      <div class="helper-text">Browse, filter, and add items to your cart.</div>
+    </div>
+    <div class="helper-text">Signed in as <%= user.displayName || user.username || user.email %> (<%= user.role %>)</div>
+  </div>
+
+  <% const availablePoints = membership ? Math.max(0, Number(membership.points) || 0) : 0; %>
+
+  <% if (membership) { %>
+    <div class="panel mb-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+          <h5 class="mb-1">Loyalty membership</h5>
+          <p class="helper-text mb-0">Redeem your points as discounts on the checkout page.</p>
+        </div>
+        <div class="text-end">
+          <div class="fw-bold fs-5 mb-0"><%= availablePoints %> pts</div>
+          <div class="small text-muted">≈ $<%= (availablePoints / 10).toFixed(2) %> available</div>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <a class="btn btn-outline-primary btn-sm" href="/checkout">Go to checkout</a>
+        <% if (availablePoints < 1) { %>
+          <div class="small text-muted align-self-center">Earn points to unlock loyalty discounts.</div>
+        <% } else { %>
+          <div class="small text-muted align-self-center">Redeem points when you checkout.</div>
+        <% } %>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="panel mb-3">
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start gap-2">
+        <div>
+          <h5 class="mb-1">Join membership</h5>
+          <p class="helper-text mb-0">Earn loyalty points on every purchase and redeem them as discounts.</p>
+        </div>
+        <a class="btn btn-outline-success" href="/membership">Join now</a>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+  <% if (messages && messages.success && messages.success.length) { %>
+    <div class="alert alert-success">
+      <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+
+  <div class="panel mb-3">
+    <form class="row g-3" id="productFilters">
+      <div class="col-md-6">
+        <label class="form-label" for="searchName">Search</label>
+        <input type="text" id="searchName" class="form-control" placeholder="Search products...">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="categoryFilter">Category</label>
+        <select id="categoryFilter" class="form-select">
+          <option value="all" selected>All categories</option>
+          <option value="uncategorized">Uncategorized</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="noImageOnly">
+          <label class="form-check-label" for="noImageOnly">No image only</label>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="table-card">
+    <table class="table table-hover align-middle text-center mb-0">
+      <thead>
+        <tr>
+          <th width="220">Product</th>
+          <th width="120">Image</th>
+          <th width="80">Quantity</th>
+          <th width="100">Price</th>
+          <th width="160">Add</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for(let i=0; i < products.length; i++) { %>
+          <% const category = products[i].category || 'Uncategorized'; %>
+          <tr>
+            <td class="text-start" data-name="<%= products[i].productName.toLowerCase() %>" data-category="<%= category.toLowerCase() %>" data-has-image="<%= products[i].image ? '1' : '0' %>">
+              <div class="fw-semibold"><a href="/product/<%= products[i].id %>"><%= products[i].productName %></a></div>
+              <div class="small text-muted"><%= category %></div>
+            </td>
+            <td>
+              <% if (products[i].image) { %>
+                <img src="/images/<%= products[i].image %>" class="product-thumb" loading="lazy" alt="<%= products[i].productName %>" onerror="this.classList.add('d-none'); this.insertAdjacentHTML('afterend','<span class=&quot;text-muted&quot;>No image</span>');">
+              <% } else { %>
+                <span class="text-muted">No image</span>
+              <% } %>
+            </td>
+            <td><%= products[i].quantity %></td>
+            <td>$<%= products[i].price.toFixed(2) %></td>
+            <td>
+              <form class="d-flex justify-content-center align-items-center gap-2" action="/cart/add/<%= products[i].id %>" method="POST">
+                <input type="number" name="quantity" class="form-control" min="1" value="1" style="max-width: 90px;">
+                <button type="submit" class="btn btn-primary">Add</button>
+              </form>
+            </td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const searchInput = document.getElementById('searchName');
+    const categorySelect = document.getElementById('categoryFilter');
+    const noImageCheckbox = document.getElementById('noImageOnly');
+    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+
+    const allowedCategories = [
+      'produce (fruits & vegetables)',
+      'meat & seafood',
+      'dairy & eggs',
+      'bakery',
+      'pantry (dry goods, canned, condiments, pasta/rice)',
+      'beverages (water, juice, soda, tea/coffee)',
+      'frozen foods',
+      'snacks & confectionery',
+      'household & cleaning',
+      'health & beauty / personal care',
+      'pet supplies',
+      'other'
+    ];
+
+    allowedCategories.forEach((cat) => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+      categorySelect.appendChild(opt);
+    });
+
+    function applyFilters() {
+      const term = (searchInput.value || '').toLowerCase();
+      const category = categorySelect.value;
+      const noImageOnly = noImageCheckbox.checked;
+
+      rows.forEach((row) => {
+        const cell = row.querySelector('td[data-name]');
+        const name = cell?.dataset.name || '';
+        const cat = cell?.dataset.category || 'uncategorized';
+        const hasImage = cell?.dataset.hasImage === '1';
+
+        const matchesName = !term || name.includes(term);
+        const matchesCategory = category === 'all' || cat === category;
+        const matchesImage = !noImageOnly || !hasImage;
+
+        row.style.display = (matchesName && matchesCategory && matchesImage) ? '' : 'none';
+      });
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    categorySelect.addEventListener('change', applyFilters);
+    noImageCheckbox.addEventListener('change', applyFilters);
+  })();
+</script>
+
+<%- include('partials/footer') %>
+
+

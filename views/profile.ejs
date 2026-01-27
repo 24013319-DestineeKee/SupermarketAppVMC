@@ -1,0 +1,89 @@
+<%- include('partials/header', {
+  title: 'My Profile - Supermarket App',
+  user,
+  navLinks: [
+    { href: '/profile', label: 'Profile' },
+    { href: '/my-orders', label: 'My Orders' },
+    { href: '/shopping', label: 'Shopping' },
+    { href: '/cart', label: 'Cart' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<style>
+  .page-shell { max-width: 720px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 24px; }
+  .helper-text { color: #6b7280; }
+</style>
+
+<div class="page-shell">
+  <div class="panel">
+    <h2 class="mb-1">My Profile</h2>
+    <p class="helper-text mb-4">Update your details. Leave password blank to keep your current one.</p>
+
+    <% if (messages && messages.error && messages.error.length) { %>
+      <div class="alert alert-danger">
+        <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+      </div>
+    <% } %>
+    <% if (messages && messages.success && messages.success.length) { %>
+      <div class="alert alert-success">
+        <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+      </div>
+    <% } %>
+
+    <% if (!profileUser) { %>
+      <div class="alert alert-warning mb-0">Unable to load your profile.</div>
+    <% } else { %>
+      <div class="mb-4">
+        <% if (membership) { %>
+          <div class="alert alert-success d-flex justify-content-between align-items-center">
+            <div>You are a member. Earn points on every purchase.</div>
+            <form action="/membership/toggle" method="POST" class="mb-0">
+              <input type="hidden" name="action" value="cancel">
+              <button type="submit" class="btn btn-outline-light btn-sm">Cancel membership</button>
+            </form>
+          </div>
+        <% } else { %>
+          <form action="/membership/toggle" method="POST" class="mb-3">
+            <input type="hidden" name="action" value="join">
+            <button type="submit" class="btn btn-success">Add membership</button>
+          </form>
+        <% } %>
+      </div>
+      <form action="/profile" method="POST">
+        <div class="mb-3">
+          <label class="form-label" for="username">Username</label>
+          <input class="form-control" type="text" id="username" name="username" value="<%= profileUser.username %>" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="email">Email</label>
+          <input class="form-control" type="email" id="email" name="email" value="<%= profileUser.email %>" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="currentPassword">Current Password</label>
+          <input class="form-control" type="password" id="currentPassword" name="currentPassword" placeholder="Enter current password to confirm changes" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="password">New Password (optional)</label>
+          <input class="form-control" type="password" id="password" name="password" placeholder="Leave blank to keep current password">
+          <div class="form-text">Must be at least 6 characters if provided.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="address">Address</label>
+          <input class="form-control" type="text" id="address" name="address" value="<%= profileUser.address || '' %>">
+        </div>
+        <div class="mb-4">
+          <label class="form-label" for="contact">Contact</label>
+          <input class="form-control" type="text" id="contact" name="contact" value="<%= profileUser.contact || '' %>">
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <a href="/shopping" class="btn btn-outline-secondary">Back to Shopping</a>
+        </div>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

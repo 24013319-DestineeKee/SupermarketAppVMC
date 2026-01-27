@@ -1,0 +1,59 @@
+<%- include('partials/header', {
+  title: 'Report an Issue',
+  user,
+  navLinks: [
+    { href: '/my-orders', label: 'My Orders' },
+    { href: '/shopping', label: 'Shopping' },
+    { href: '/cart', label: 'Cart' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<div class="container" style="max-width: 760px; margin-top: 32px; margin-bottom: 48px;">
+  <h2 class="mb-3">Ask for a Refund for Order #<%= order.id %></h2>
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+  <% if (messages && messages.success && messages.success.length) { %>
+    <div class="alert alert-success">
+      <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+
+  <% if (report) { %>
+    <div class="alert alert-info">
+      You already submitted a report for this order. Current status:
+      <strong><%= report.status %></strong>
+      <% if (report.refundAmount) { %> — Refund: $<%= Number(report.refundAmount).toFixed(2) %><% } %>
+    </div>
+  <% } %>
+
+  <form action="/orders/<%= order.id %>/report" method="POST" enctype="multipart/form-data" class="card p-4 shadow-sm">
+    <div class="mb-3">
+      <label class="form-label">Refund type</label>
+      <select name="supportType" class="form-select" required>
+        <option value="full_refund">Full refund</option>
+        <option value="partial_refund">Partial refund</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Issue summary</label>
+      <input type="text" name="reason" class="form-control" placeholder="E.g., Damaged items on delivery" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Details</label>
+      <textarea name="description" class="form-control" rows="4" placeholder="Describe what went wrong and which items were affected." required></textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Upload evidence (image)</label>
+      <input type="file" name="evidence" accept="image/*" class="form-control">
+      <div class="form-text">Optional but recommended: photo of the package/damaged items.</div>
+    </div>
+    <button type="submit" class="btn btn-primary">Ask for refund</button>
+    <a class="btn btn-link" href="/my-orders">Back to orders</a>
+  </form>
+</div>
+
+<%- include('partials/footer') %>
