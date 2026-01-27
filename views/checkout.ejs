@@ -15,7 +15,6 @@
   .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .section-heading .helper-text { margin: 0; color: #6b7280; }
   .summary-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
-  #stripe-element { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
 </style>
 
 <div class="page-shell">
@@ -105,18 +104,15 @@
               <% } %>
             </div>
           <% } %>
-          <div class="mt-3">
-            <div class="mb-3">
-              <p class="text-muted small mb-2">Pay by card securely with Stripe.</p>
-              <% if (stripePublishableKey) { %>
-                <div id="stripe-element" class="d-none"></div>
-                <div id="stripe-error" class="alert alert-danger d-none mt-2"></div>
-                <div class="small text-muted mt-2" id="stripe-note">Click below to load the card form.</div>
-                <button type="button" id="stripe-pay-btn" class="btn btn-dark w-100 mt-2">Pay with Card</button>
-              <% } else { %>
-                <div class="alert alert-warning mb-0">Stripe is not configured. Please contact support.</div>
-              <% } %>
+          <% if (stripePublishableKey) { %>
+            <div class="mt-3">
+              <p class="text-muted small mb-2">Pay securely by card with Stripe.</p>
+              <div id="stripe-card-element" class="form-control" style="height: 48px; padding-top: 12px;"></div>
+              <div id="stripe-error" class="text-danger small mt-2 d-none"></div>
+              <button id="stripe-pay-button" type="button" class="btn btn-dark w-100 mt-3">Pay with Card (Stripe)</button>
             </div>
+          <% } %>
+          <div class="mt-3">
             <p class="text-muted small mb-2">You will be redirected to PayPal to pay securely.</p>
             <div id="paypal-button-container"></div>
           </div>
@@ -182,17 +178,17 @@
   </div>
 </div>
 
-<% if (paypalClientId) { %>
-<script src="https://www.paypal.com/sdk/js?client-id=<%= paypalClientId %>&currency=SGD"></script>
-<% } %>
 <% if (stripePublishableKey) { %>
 <script src="https://js.stripe.com/v3/"></script>
+<% } %>
+<% if (paypalClientId) { %>
+<script src="https://www.paypal.com/sdk/js?client-id=<%= paypalClientId %>&currency=SGD"></script>
 <% } %>
 <script>
   (() => {
     const clientId = '<%= paypalClientId %>';
+    const stripeKey = '<%= stripePublishableKey %>';
     const alertBox = document.getElementById('checkout-alert');
-    const stripePublishableKey = '<%= stripePublishableKey %>';
     const showError = (msg) => {
       if (!alertBox) return;
       alertBox.textContent = msg;
@@ -209,14 +205,6 @@
     });
 
     const stripeError = document.getElementById('stripe-error');
-    const stripeNote = document.getElementById('stripe-note');
-    const stripeButton = document.getElementById('stripe-pay-btn');
-    const stripeElementHost = document.getElementById('stripe-element');
-    let stripe = null;
-    let stripeElements = null;
-    let stripeClientSecret = null;
-    let paymentElement = null;
-
     const showStripeError = (msg) => {
       if (!stripeError) return;
       stripeError.textContent = msg;
@@ -225,158 +213,122 @@
     const clearStripeError = () => {
       if (stripeError) stripeError.classList.add('d-none');
     };
-    const setStripeBusy = (busy) => {
-      if (!stripeButton) return;
-      stripeButton.disabled = !!busy;
-      stripeButton.textContent = busy ? 'Processing...' : (stripeClientSecret ? 'Confirm Card Payment' : 'Pay with Card');
-    };
 
-    const initStripeElements = async () => {
-      if (!stripePublishableKey || !stripeButton || !stripeElementHost) return;
-      if (!stripe) stripe = Stripe(stripePublishableKey);
-      clearStripeError();
-      setStripeBusy(true);
-      const payload = payloadFromForm();
-      const res = await fetch('/api/stripe/create-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error || !data.clientSecret) {
-        throw new Error(data.error || 'Unable to start Stripe payment.');
-      }
-      stripeClientSecret = data.clientSecret;
-      stripeElements = stripe.elements({ clientSecret: stripeClientSecret });
-      paymentElement = stripeElements.create('payment');
-      stripeElementHost.classList.remove('d-none');
-      paymentElement.mount('#stripe-element');
-      if (stripeNote) stripeNote.textContent = 'Enter your card details, then click Confirm Card Payment.';
-      setStripeBusy(false);
-    };
+    if (stripeKey && typeof Stripe !== 'undefined') {
+      const stripe = Stripe(stripeKey);
+      const elements = stripe.elements();
+      const card = elements.create('card', { hidePostalCode: true });
+      card.mount('#stripe-card-element');
 
-    const confirmStripePayment = async () => {
-      if (!stripe || !stripeElements) return;
-      clearStripeError();
-      setStripeBusy(true);
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements: stripeElements,
-        confirmParams: {
-          return_url: window.location.origin + '/checkout'
-        },
-        redirect: 'if_required'
-      });
-      if (error) {
-        showStripeError(error.message || 'Unable to confirm card payment.');
-        setStripeBusy(false);
-        return;
-      }
-      if (!paymentIntent || !paymentIntent.id) {
-        showStripeError('Payment intent not returned. Please try again.');
-        setStripeBusy(false);
-        return;
-      }
-      const completeRes = await fetch('/api/stripe/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentIntentId: paymentIntent.id })
-      });
-      const completeBody = await completeRes.json().catch(() => ({}));
-      if (!completeRes.ok || completeBody.error) {
-        showStripeError(completeBody.error || 'Unable to finalize payment.');
-        setStripeBusy(false);
-        return;
-      }
-      window.location.href = completeBody.redirectUrl || `/invoice/${completeBody.orderId}`;
-    };
-
-    if (stripeButton) {
-      stripeButton.addEventListener('click', async () => {
-        try {
-          if (!stripeClientSecret) {
-            await initStripeElements();
-            setStripeBusy(false);
-            return;
-          }
-          await confirmStripePayment();
-        } catch (err) {
-          showStripeError(err.message || 'Unable to start Stripe payment.');
-          setStripeBusy(false);
-        }
-      });
-    }
-
-    const params = new URLSearchParams(window.location.search);
-    const redirectedPaymentIntent = params.get('payment_intent');
-    if (stripePublishableKey && redirectedPaymentIntent && stripeButton) {
-      fetch('/api/stripe/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentIntentId: redirectedPaymentIntent })
-      })
-        .then(async (res) => {
-          const body = await res.json().catch(() => ({}));
-          if (!res.ok || body.error) {
-            throw new Error(body.error || 'Unable to finalize Stripe payment.');
-          }
-          window.location.href = body.redirectUrl || `/invoice/${body.orderId}`;
-        })
-        .catch((err) => {
-          showStripeError(err.message || 'Stripe payment needs attention. Please try again.');
-        });
-    }
-
-    if (clientId) {
-      if (typeof paypal === 'undefined') {
-        showError('PayPal script failed to load. Please refresh and try again.');
-        return;
-      }
-      paypal.Buttons({
-        style: { shape: 'rect', color: 'gold', layout: 'vertical', label: 'paypal' },
-        createOrder: function () {
+      const stripeButton = document.getElementById('stripe-pay-button');
+      if (stripeButton) {
+        stripeButton.addEventListener('click', async () => {
           clearError();
+          clearStripeError();
+          stripeButton.disabled = true;
           const payload = payloadFromForm();
-          return fetch('/api/paypal/create-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          })
-            .then(async (res) => {
-              const data = await res.json().catch(() => ({}));
-              if (!res.ok || data.error) {
-                throw new Error(data.error || 'Unable to start PayPal payment.');
-              }
-              return data.orderID;
-            })
-            .catch((err) => {
-              showError(err.message || 'Unable to start PayPal payment.');
-              throw err;
+          try {
+            const createRes = await fetch('/api/stripe/create-intent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
             });
-        },
-        onApprove: function (data) {
-          clearError();
-          return fetch('/api/paypal/capture-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderID: data.orderID })
-          })
-            .then(async (res) => {
-              const body = await res.json().catch(() => ({}));
-              if (!res.ok || body.error) {
-                throw new Error(body.error || 'Unable to capture PayPal payment.');
+            const createBody = await createRes.json().catch(() => ({}));
+            if (!createRes.ok || createBody.error) {
+              throw new Error(createBody.error || 'Unable to start Stripe payment.');
+            }
+
+            const confirmResult = await stripe.confirmCardPayment(createBody.clientSecret, {
+              payment_method: {
+                card,
+                billing_details: {
+                  name: payload.fullName,
+                  email: payload.email,
+                  phone: payload.contact
+                }
               }
-              window.location.href = body.redirectUrl || `/invoice/${body.orderId}`;
-            })
-            .catch((err) => {
-              showError(err.message || 'Unable to complete payment.');
             });
-        },
-        onError: function (err) {
-          showError('PayPal error: ' + (err && err.message ? err.message : 'Please try again.'));
-        }
+
+            if (confirmResult.error) {
+              showStripeError(confirmResult.error.message || 'Unable to complete Stripe payment.');
+              stripeButton.disabled = false;
+              return;
+            }
+
+            const intent = confirmResult.paymentIntent;
+            if (!intent || intent.status !== 'succeeded') {
+              showStripeError('Payment not completed. Please try again.');
+              stripeButton.disabled = false;
+              return;
+            }
+
+            const confirmRes = await fetch('/api/stripe/confirm-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentIntentId: intent.id })
+            });
+            const confirmBody = await confirmRes.json().catch(() => ({}));
+            if (!confirmRes.ok || confirmBody.error) {
+              throw new Error(confirmBody.error || 'Unable to finalize Stripe payment.');
+            }
+            window.location.href = confirmBody.redirectUrl || `/invoice/${confirmBody.orderId}`;
+          } catch (err) {
+            showStripeError(err.message || 'Unable to complete Stripe payment.');
+            stripeButton.disabled = false;
+          }
+        });
+      }
+    }
+
+    if (clientId && typeof paypal !== 'undefined') {
+      paypal.Buttons({
+      style: { shape: 'rect', color: 'gold', layout: 'vertical', label: 'paypal' },
+      createOrder: function () {
+        clearError();
+        const payload = payloadFromForm();
+        return fetch('/api/paypal/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error) {
+              throw new Error(data.error || 'Unable to start PayPal payment.');
+            }
+            return data.orderID;
+          })
+          .catch((err) => {
+            showError(err.message || 'Unable to start PayPal payment.');
+            throw err;
+          });
+      },
+      onApprove: function (data) {
+        clearError();
+        return fetch('/api/paypal/capture-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderID: data.orderID })
+        })
+          .then(async (res) => {
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok || body.error) {
+              throw new Error(body.error || 'Unable to capture PayPal payment.');
+            }
+            window.location.href = body.redirectUrl || `/invoice/${body.orderId}`;
+          })
+          .catch((err) => {
+            showError(err.message || 'Unable to complete payment.');
+          });
+      },
+      onError: function (err) {
+        showError('PayPal error: ' + (err && err.message ? err.message : 'Please try again.'));
+      }
       }).render('#paypal-button-container');
-    } else if (!stripePublishableKey) {
+    } else if (!clientId) {
       showError('PayPal is not configured. Please contact support.');
+    } else if (typeof paypal === 'undefined') {
+      showError('PayPal script failed to load. Please refresh and try again.');
     }
   })();
 </script>

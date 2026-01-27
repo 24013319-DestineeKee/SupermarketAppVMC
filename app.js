@@ -231,8 +231,8 @@ app.post('/profile', checkAuthenticated, (req, res) => {
   const id = req.session.user.id;
   const { username, email, password, address, contact, currentPassword } = req.body;
 
-  if (!username || !email || !address || !contact || !currentPassword) {
-    req.flash('error', 'Username, email, address, contact, and current password are required.');
+  if (!username || !email || !address || !contact) {
+    req.flash('error', 'Username, email, address, and contact are required.');
     return res.redirect('/profile');
   }
   if (password && password.length < 6) {
@@ -249,6 +249,24 @@ app.post('/profile', checkAuthenticated, (req, res) => {
       if (findErr) console.error('DB error:', findErr);
       req.flash('error', 'User not found.');
       return res.redirect('/logout');
+    }
+
+    const hasChanges = (
+      username !== existing.username ||
+      email !== existing.email ||
+      (address || '') !== (existing.address || '') ||
+      (contact || '') !== (existing.contact || '') ||
+      !!password
+    );
+
+    if (!hasChanges) {
+      req.flash('error', 'No changes detected.');
+      return res.redirect('/profile');
+    }
+
+    if (!currentPassword) {
+      req.flash('error', 'Please enter your current password to save changes.');
+      return res.redirect('/profile');
     }
 
     const currentHashed = crypto.createHash('sha1').update(currentPassword).digest('hex');
@@ -353,15 +371,17 @@ app.get('/checkout', checkAuthenticated, CartController.viewCheckout);
 app.post('/checkout', checkAuthenticated, CartController.processCheckout);
 app.post('/api/paypal/create-order', checkAuthenticated, CartController.createPaypalOrder);
 app.post('/api/paypal/capture-order', checkAuthenticated, CartController.capturePaypalOrder);
-app.post('/api/stripe/create-intent', checkAuthenticated, CartController.createStripeIntent);
-app.post('/api/stripe/complete', checkAuthenticated, CartController.completeStripePayment);
 app.post('/nets/qr', checkAuthenticated, NetsController.generateQrCode);
 app.get('/nets/qr/fail', checkAuthenticated, NetsController.fail.bind(NetsController));
 app.post('/nets/confirm', checkAuthenticated, NetsController.confirmPayment.bind(NetsController));
+app.post('/api/stripe/create-intent', checkAuthenticated, CartController.createStripePaymentIntent);
+app.post('/api/stripe/confirm-payment', checkAuthenticated, CartController.confirmStripePayment);
 app.get('/orders/:id/report', checkAuthenticated, RefundController.reportForm.bind(RefundController));
 app.post('/orders/:id/report', checkAuthenticated, reportUpload.single('evidence'), RefundController.ensureRequiredFields.bind(RefundController), RefundController.submitReport.bind(RefundController));
 app.get('/refunds', checkAuthenticated, checkAdmin, RefundController.listReports.bind(RefundController));
+app.get('/refunds/:id', checkAuthenticated, checkAdmin, RefundController.viewReport.bind(RefundController));
 app.post('/refunds/:id/resolve', checkAuthenticated, checkAdmin, RefundController.resolveReport.bind(RefundController));
+app.get('/my-refunds/:orderId', checkAuthenticated, RefundController.viewUserReport.bind(RefundController));
 app.get('/membership', checkAuthenticated, (req, res) => {
   MembershipModel.getByUser(req.session.user.id, (err, membership) => {
     if (err) {

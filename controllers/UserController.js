@@ -1,4 +1,5 @@
 // ...existing code...
+const crypto = require('crypto');
 const UserModel = require('../models/user');
 const MembershipModel = require('../models/membership');
 
@@ -109,6 +110,24 @@ const UserController = {
     }
     const userId = req.session.user.id;
     const action = req.body && req.body.action;
+    const currentPassword = req.body && req.body.currentPassword;
+    if (!currentPassword) {
+      req.flash('error', 'Please enter your password to confirm this change.');
+      return res.redirect('/profile');
+    }
+
+    UserModel.getUserById(userId, (findErr, existing) => {
+      if (findErr || !existing) {
+        if (findErr) console.error('DB error:', findErr);
+        req.flash('error', 'User not found.');
+        return res.redirect('/profile');
+      }
+      const currentHashed = crypto.createHash('sha1').update(currentPassword).digest('hex');
+      if (currentHashed !== existing.password) {
+        req.flash('error', 'Current password is incorrect.');
+        return res.redirect('/profile');
+      }
+
     if (action === 'join') {
       MembershipModel.createForUser(userId, (err) => {
         if (err) {
@@ -142,6 +161,7 @@ const UserController = {
       req.flash('error', 'Invalid membership action.');
       return res.redirect('/profile');
     }
+    });
   }
 };
 

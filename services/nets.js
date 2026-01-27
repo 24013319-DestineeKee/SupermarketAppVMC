@@ -3,6 +3,8 @@ const path = require('path');
 
 const NETS_API =
   'https://sandbox.nets.openapipaas.com/api/v1/common/payments/nets-qr/request';
+const NETS_QUERY_API =
+  'https://sandbox.nets.openapipaas.com/api/v1/common/payments/nets-qr/query';
 
 const loadCourseInitId = () => {
   try {
@@ -31,6 +33,32 @@ const buildWebhookUrl = (txnRetrievalRef, courseInitId) => {
   return `https://sandbox.nets.openapipaas.com/api/v1/common/payments/nets/webhook?txn_retrieval_ref=${txnRetrievalRef}&course_init_id=${courseInitId}`;
 };
 
+const getPaymentStatus = async (txnRetrievalRef, frontendTimeoutStatus = 0) => {
+  if (!process.env.API_KEY || !process.env.PROJECT_ID) {
+    throw new Error('Missing NETS API configuration (API_KEY or PROJECT_ID).');
+  }
+  if (!txnRetrievalRef) {
+    throw new Error('Missing NETS transaction reference.');
+  }
+  const payload = {
+    txn_retrieval_ref: txnRetrievalRef,
+    frontend_timeout_status: frontendTimeoutStatus
+  };
+  const response = await axios.post(NETS_QUERY_API, payload, {
+    headers: {
+      ...buildHeaders(),
+      'Content-Type': 'application/json'
+    },
+    timeout: 7000
+  });
+  const data = response?.data?.result?.data || {};
+  return {
+    txnStatus: data.txn_status ?? data.txnStatus ?? data.status,
+    responseCode: data.response_code || data.responseCode,
+    raw: response?.data
+  };
+};
+
 const requestQrCode = async (amount) => {
   if (!process.env.API_KEY || !process.env.PROJECT_ID) {
     throw new Error('Missing NETS API configuration (API_KEY or PROJECT_ID).');
@@ -50,5 +78,6 @@ const requestQrCode = async (amount) => {
 };
 
 module.exports = {
-  requestQrCode
+  requestQrCode,
+  getPaymentStatus
 };

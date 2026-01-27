@@ -32,15 +32,20 @@
 
   <form action="/orders/<%= order.id %>/report" method="POST" enctype="multipart/form-data" class="card p-4 shadow-sm">
     <div class="mb-3">
-      <label class="form-label">Refund type</label>
-      <select name="supportType" class="form-select" required>
-        <option value="full_refund">Full refund</option>
-        <option value="partial_refund">Partial refund</option>
+      <label class="form-label" for="reasonSelect">Issue summary</label>
+      <select id="reasonSelect" name="reason" class="form-select" required>
+        <option value="" selected disabled>Select a reason</option>
+        <option value="Damaged items">Damaged items</option>
+        <option value="Missing items">Missing items</option>
+        <option value="Wrong items">Wrong items</option>
+        <option value="Late delivery">Late delivery</option>
+        <option value="Quality issue">Quality issue</option>
+        <option value="Other">Other</option>
       </select>
     </div>
-    <div class="mb-3">
-      <label class="form-label">Issue summary</label>
-      <input type="text" name="reason" class="form-control" placeholder="E.g., Damaged items on delivery" required>
+    <div class="mb-3 d-none" id="reasonOtherWrap">
+      <label class="form-label" for="reasonOther">Other reason</label>
+      <input type="text" id="reasonOther" name="reasonOther" class="form-control" placeholder="Describe your reason">
     </div>
     <div class="mb-3">
       <label class="form-label">Details</label>
@@ -55,5 +60,22 @@
     <a class="btn btn-link" href="/my-orders">Back to orders</a>
   </form>
 </div>
+
+<script>
+  (() => {
+    const select = document.getElementById('reasonSelect');
+    const otherWrap = document.getElementById('reasonOtherWrap');
+    const otherInput = document.getElementById('reasonOther');
+    const toggleOther = () => {
+      const isOther = select && select.value === 'Other';
+      if (otherWrap) otherWrap.classList.toggle('d-none', !isOther);
+      if (otherInput) otherInput.required = !!isOther;
+    };
+    if (select) {
+      select.addEventListener('change', toggleOther);
+      toggleOther();
+    }
+  })();
+</script>
 
 <%- include('partials/footer') %>

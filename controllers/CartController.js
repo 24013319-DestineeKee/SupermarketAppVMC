@@ -39,7 +39,7 @@ const computeLoyaltyUsage = (loyaltyRedemption, subtotal) => {
   if (!requestedPoints || requestedPoints <= 0) {
     return { pointsUsed: 0, discountAmount: 0 };
   }
-  const maxPointsForTotal = Math.max(0, Math.floor(subtotal * 10 + Number.EPSILON));
+  const maxPointsForTotal = Math.max(0, Math.floor(subtotal * 10 + Number.EPSILON) - 1);
   const applicablePoints = Math.min(requestedPoints, maxPointsForTotal);
   if (!applicablePoints) {
     return { pointsUsed: 0, discountAmount: 0 };
@@ -303,7 +303,7 @@ const CartController = {
           req.session.user.membership = !!membership;
         }
         const availablePoints = membership ? Math.max(0, Math.floor(Number(membership.points) || 0)) : 0;
-        const maxPointsForTotal = Math.max(0, Math.floor(checkout.discountedTotal * 10 + Number.EPSILON));
+        const maxPointsForTotal = Math.max(0, Math.floor(checkout.discountedTotal * 10 + Number.EPSILON) - 1);
         const maxRedeemablePoints = Math.min(availablePoints, maxPointsForTotal);
         const redemptionPoints = req.session.loyaltyRedemption
           ? Math.max(0, Math.floor(Number(req.session.loyaltyRedemption.points) || 0))
@@ -503,7 +503,7 @@ const CartController = {
     }
   },
 
-  async createStripeIntent(req, res) {
+  async createStripePaymentIntent(req, res) {
     if (!req.session?.user) {
       return res.status(401).json({ error: 'Please log in to checkout.' });
     }
@@ -522,22 +522,16 @@ const CartController = {
         return res.status(400).json({ error: 'Your cart is empty.' });
       }
 
-      const intent = await StripeService.createPaymentIntent(
-        checkout.payableTotal,
-        'sgd',
-        {
-          userId: String(req.session.user.id || ''),
-          discountPercent: String(checkout.discountPercent || 0),
-          loyaltyPoints: String(checkout.loyaltyPoints || 0)
-        }
-      );
+      const intent = await StripeService.createPaymentIntent(checkout.payableTotal, 'sgd', {
+        userId: String(req.session.user.id || ''),
+        cartTotal: checkout.cartTotal.toFixed(2)
+      });
 
-      if (!intent || !intent.id || !intent.client_secret) {
+      if (!intent || !intent.client_secret) {
         return res.status(500).json({ error: 'Unable to start Stripe payment.' });
       }
 
       req.session.stripeCheckout = {
-        paymentIntentId: intent.id,
         orderItems: checkout.orderItems,
         totalAmount: checkout.payableTotal,
         discountPercent: checkout.discountPercent,
@@ -549,17 +543,18 @@ const CartController = {
           discountApplied: checkout.discountPercent > 0 ? '25% first order discount applied' : '',
           loyaltyApplied: checkout.loyaltyPoints ? `${checkout.loyaltyPoints} points redeemed for $${checkout.loyaltyDiscount.toFixed(2)} discount` : ''
         },
+        stripePaymentIntentId: intent.id,
         createdAt: Date.now()
       };
 
       return res.json({ clientSecret: intent.client_secret });
     } catch (err) {
-      console.error('Stripe intent error:', err);
+      console.error('Stripe create intent error:', err);
       return res.status(500).json({ error: 'Unable to start Stripe payment. Please try again.' });
     }
   },
 
-  async completeStripePayment(req, res) {
+  async confirmStripePayment(req, res) {
     if (!req.session?.user) {
       return res.status(401).json({ error: 'Please log in to checkout.' });
     }
@@ -568,9 +563,9 @@ const CartController = {
     const pending = req.session.stripeCheckout;
 
     if (!paymentIntentId) return res.status(400).json({ error: 'Missing Stripe payment intent.' });
-    if (!pending) return res.status(400).json({ error: 'No pending Stripe payment found.' });
-    if (pending.paymentIntentId && pending.paymentIntentId !== paymentIntentId) {
-      return res.status(400).json({ error: 'Stripe payment does not match the current session.' });
+    if (!pending) return res.status(400).json({ error: 'No pending Stripe checkout found.' });
+    if (pending.stripePaymentIntentId && pending.stripePaymentIntentId !== paymentIntentId) {
+      return res.status(400).json({ error: 'Stripe payment intent does not match the current session.' });
     }
 
     const ttlMs = 20 * 60 * 1000; // 20 minutes
@@ -600,7 +595,7 @@ const CartController = {
         delete req.session.stripeCheckout;
         if (orderErr) {
           console.error('Error creating order after Stripe payment:', orderErr);
-          return res.status(500).json({ error: 'Payment completed but order creation failed. Please contact support.' });
+          return res.status(500).json({ error: 'Payment captured but order creation failed. Please contact support.' });
         }
         if (req.session) delete req.session.loyaltyRedemption;
 
@@ -610,7 +605,7 @@ const CartController = {
         });
       });
     } catch (err) {
-      console.error('Stripe complete error:', err);
+      console.error('Stripe confirm payment error:', err);
       return res.status(500).json({ error: 'Unable to complete Stripe payment. Please try again.' });
     }
   },
@@ -822,13 +817,13 @@ const CartController = {
           return res.redirect('/cart');
         }
 
-        const maxPointsForTotal = Math.max(0, Math.floor(checkout.discountedTotal * 10 + Number.EPSILON));
+        const maxPointsForTotal = Math.max(0, Math.floor(checkout.discountedTotal * 10 + Number.EPSILON) - 1);
         if (maxPointsForTotal <= 0) {
           req.flash('error', 'Unable to apply loyalty points to this total.');
           return res.redirect('/checkout');
         }
         if (requestedPoints > maxPointsForTotal) {
-          req.flash('error', `You can redeem up to ${maxPointsForTotal} point${maxPointsForTotal === 1 ? '' : 's'} for this payment amount.`);
+          req.flash('error', `You can redeem up to ${maxPointsForTotal} point${maxPointsForTotal === 1 ? '' : 's'} for this payment amount (must be less than the total).`);
           return res.redirect('/checkout');
         }
 

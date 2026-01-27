@@ -48,37 +48,91 @@ const computeTotals = (userId) => new Promise((resolve, reject) => {
   });
 });
 
-const NetsController = {
-  handleFail(req, res, msg) {
-    req.flash('error', msg || 'NETS payment failed. Please try again.');
-    return res.redirect('/checkout');
-  },
+const handleFail = (req, res, msg) => {
+  req.flash('error', msg || 'NETS payment failed. Please try again.');
+  return res.redirect('/checkout');
+};
 
+const normalizeStatus = (rawStatus, responseCode) => {
+  const value = rawStatus != null ? String(rawStatus).trim().toLowerCase() : '';
+  const code = responseCode != null ? String(responseCode).trim() : '';
+  if (code === '00' || code.startsWith('00')) return 'success';
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    if (numeric > 0) return 'success';
+    if (numeric === 0) return 'pending';
+  }
+  if (value === '1' || value === 'success' || value === 'completed' || value === 'paid' || value === 'successful' || value === 'approved' || value === 'authorised' || value === 'authorized' || value === 'settled') {
+    return 'success';
+  }
+  if (value === '0' || value === 'pending' || value === 'processing' || value === '' || value === 'null' || value === 'undefined') {
+    return 'pending';
+  }
+  return 'failed';
+};
+
+const NetsController = {
   fail(req, res) {
     const reason = req.query?.reason;
     const msg = reason === 'timeout'
       ? 'NETS QR timed out. Please generate a new code.'
       : 'NETS payment failed or was cancelled.';
-    return this.handleFail(req, res, msg);
+    return handleFail(req, res, msg);
   },
 
   async confirmPayment(req, res) {
+    const wantsJson = (req.headers.accept && req.headers.accept.includes('application/json'))
+      || (req.headers['content-type'] && req.headers['content-type'].includes('application/json'))
+      || req.xhr;
     const userId = req.session?.user?.id;
     if (!userId) {
-      if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      if (wantsJson) {
         return res.status(401).json({ ok: false, error: 'Please log in.' });
       }
       req.flash('error', 'Please log in.');
       return res.redirect('/login');
     }
     try {
+      const txn = req.session?.netsTxn;
+      if (!txn || !txn.txnRetrievalRef) {
+        if (wantsJson) {
+          return res.json({ ok: false, status: 'pending', error: 'NETS session expired.', redirect: '/checkout' });
+        }
+        req.flash('error', 'NETS session expired. Please try again.');
+        return res.redirect('/checkout');
+      }
+
+      let statusResp;
+      try {
+        statusResp = await NetsService.getPaymentStatus(txn.txnRetrievalRef, 0);
+      } catch (statusErr) {
+        if (wantsJson) {
+          return res.json({ ok: false, status: 'pending', error: 'Unable to reach NETS status endpoint.' });
+        }
+        req.flash('error', 'Unable to check NETS payment status right now. Please try again.');
+        return res.redirect('/checkout');
+      }
+
+      const status = normalizeStatus(statusResp?.txnStatus, statusResp?.responseCode);
+      const elapsedMs = txn.createdAt ? Date.now() - txn.createdAt : 0;
+      const optimisticAfterMs = 20000;
+      if (status !== 'success' && elapsedMs < optimisticAfterMs) {
+        if (wantsJson) {
+          return res.json({ ok: false, status, redirect: '/checkout' });
+        }
+        req.flash('error', status === 'pending'
+          ? 'Payment not completed yet. Please try again after payment succeeds.'
+          : 'NETS payment failed or was cancelled.');
+        return res.redirect('/checkout');
+      }
+
       const { cart, discountedTotal, discountPercent } = await computeTotals(userId);
       if (!cart || cart.length === 0) {
-        if (req.headers.accept && req.headers.accept.includes('application/json')) {
-          return res.status(400).json({ ok: false, error: 'Your cart is empty.' });
+        if (wantsJson) {
+          return res.status(400).json({ ok: false, status: 'failed', error: 'Your cart is empty.', redirect: '/checkout' });
         }
         req.flash('error', 'Your cart is empty.');
-        return res.redirect('/cart');
+        return res.redirect('/checkout');
       }
 
       const orderItems = cart.map((item) => ({
@@ -100,10 +154,10 @@ const NetsController = {
         if (orderErr) {
           console.error('Error creating order after NETS payment:', orderErr);
           req.flash('error', 'Payment failed. Please try again.');
-          if (req.headers.accept && req.headers.accept.includes('application/json')) {
-            return res.status(500).json({ ok: false, redirect: '/nets/qr' });
+          if (wantsJson) {
+            return res.status(500).json({ ok: false, status: 'failed', redirect: '/checkout' });
           }
-          return res.redirect('/nets/qr');
+          return res.redirect('/checkout');
         }
         const orderId = result.orderId;
         const decTasks = orderItems.map((item) => new Promise((resolve, reject) => {
@@ -114,14 +168,15 @@ const NetsController = {
         }));
 
         const finish = () => {
-          if (req.headers.accept && req.headers.accept.includes('application/json')) {
-            return res.json({ ok: true, orderId, redirect: '/shopping' });
+          if (wantsJson) {
+            return res.json({ ok: true, orderId, redirect: `/invoice/${orderId}` });
           }
-          return res.redirect('/shopping');
+          return res.redirect(`/invoice/${orderId}`);
         };
 
         Promise.all(decTasks)
           .then(() => {
+            if (req.session) delete req.session.netsTxn;
             CartModel.clearCartByUser(userId, (clearErr) => {
               if (clearErr) console.error('Error clearing cart after NETS payment:', clearErr);
             });
@@ -138,19 +193,19 @@ const NetsController = {
           .catch((err) => {
             console.error('Stock decrement error after NETS payment:', err);
             req.flash('error', 'Payment failed. Please try again.');
-            if (req.headers.accept && req.headers.accept.includes('application/json')) {
-              return res.status(500).json({ ok: false, redirect: '/nets/qr' });
+            if (wantsJson) {
+              return res.status(500).json({ ok: false, status: 'failed', redirect: '/checkout' });
             }
-            return res.redirect('/nets/qr');
+            return res.redirect('/checkout');
           });
       });
     } catch (err) {
       console.error('NETS confirmPayment error:', err);
       req.flash('error', 'Payment failed. Please try again.');
-      if (req.headers.accept && req.headers.accept.includes('application/json')) {
-        return res.status(500).json({ ok: false, redirect: '/nets/qr' });
+      if (wantsJson) {
+        return res.status(500).json({ ok: false, status: 'pending', redirect: '/checkout' });
       }
-      return res.redirect('/nets/qr');
+      return res.redirect('/checkout');
     }
   },
 
@@ -163,7 +218,7 @@ const NetsController = {
     try {
       const { cart, discountedTotal } = await computeTotals(userId);
       if (!cart || cart.length === 0) {
-        return this.handleFail(req, res, 'Your cart is empty.');
+        return handleFail(req, res, 'Your cart is empty.');
       }
 
       const { qrData, courseInitId, webhookUrl, fullResponse } = await NetsService.requestQrCode(discountedTotal);
@@ -174,6 +229,14 @@ const NetsController = {
         qrData.qr_code
       ) {
         const txnRetrievalRef = qrData.txn_retrieval_ref;
+        if (req.session) {
+          req.session.netsTxn = {
+            txnRetrievalRef,
+            courseInitId,
+            total: discountedTotal,
+            createdAt: Date.now()
+          };
+        }
 
         return res.render('netsQr', {
           title: 'Scan to Pay',
@@ -192,10 +255,10 @@ const NetsController = {
       }
 
       const errorMsg = qrData.error_message || 'An error occurred while generating the QR code.';
-      return this.handleFail(req, res, errorMsg);
+      return handleFail(req, res, errorMsg);
     } catch (error) {
       console.error('Error in generateQrCode:', error.message);
-      return this.handleFail(req, res, 'Unable to start NETS payment. Please try again.');
+      return handleFail(req, res, 'Unable to start NETS payment. Please try again.');
     }
   }
 };

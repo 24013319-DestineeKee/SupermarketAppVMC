@@ -1,0 +1,94 @@
+<%- include('partials/header', {
+  title: 'Refund Request Details',
+  user,
+  navLinks: [
+    { href: '/profile', label: 'Profile' },
+    { href: '/my-orders', label: 'My Orders' },
+    { href: '/shopping', label: 'Shopping' },
+    { href: '/cart', label: 'Cart' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<style>
+  .page-shell { max-width: 980px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 24px; }
+  .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill-pending { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+  .pill-approved { background: #ecfeff; color: #0e7490; border: 1px solid #a5f3fc; }
+  .pill-rejected { background: #fef2f2; color: #991b1b; border: 1px solid #fecdd3; }
+</style>
+
+<div class="page-shell">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h2 class="mb-0">Refund Request #<%= report.id %></h2>
+      <p class="text-muted mb-0">Review your refund request details.</p>
+    </div>
+    <a href="/my-orders" class="btn btn-outline-primary btn-sm">Back to orders</a>
+  </div>
+
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+  <% if (messages && messages.success && messages.success.length) { %>
+    <div class="alert alert-success">
+      <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+
+  <div class="panel">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="text-muted small">Order</div>
+        <div class="fw-semibold">Order #<%= report.orderId %></div>
+        <div class="small text-muted">Total: $<%= Number(report.orderTotal || 0).toFixed(2) %></div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">Status</div>
+        <% const status = (report.status || 'pending'); %>
+        <% if (status === 'pending') { %>
+          <span class="pill pill-pending">Pending</span>
+        <% } else if (status.startsWith('approved')) { %>
+          <span class="pill pill-approved"><%= status.replace('approved_', 'approved ') %></span>
+        <% } else { %>
+          <span class="pill pill-rejected">Rejected</span>
+        <% } %>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">Type</div>
+        <div class="fw-semibold"><%= report.supportType === 'partial_refund' ? 'Partial refund' : 'Full refund' %></div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">Refund Amount</div>
+        <div class="fw-semibold">$<%= Number(report.refundAmount || 0).toFixed(2) %></div>
+      </div>
+      <div class="col-12">
+        <div class="text-muted small">Reason</div>
+        <div class="fw-semibold"><%= report.reason %></div>
+      </div>
+      <div class="col-12">
+        <div class="text-muted small">Description</div>
+        <div><%= report.description || 'N/A' %></div>
+      </div>
+      <div class="col-12">
+        <div class="text-muted small">Evidence</div>
+        <% if (report.image) { %>
+          <img src="/reports/<%= report.image %>" alt="evidence" style="width: 160px; height: 160px; object-fit: cover;" loading="lazy">
+        <% } else { %>
+          <div class="text-muted">None</div>
+        <% } %>
+      </div>
+      <% if (report.resolutionNote) { %>
+        <div class="col-12">
+          <div class="text-muted small">Resolution Note</div>
+          <div><%= report.resolutionNote %></div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

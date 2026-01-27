@@ -1,0 +1,140 @@
+<%- include('partials/header', {
+  title: 'Refund Request Details',
+  user,
+  navLinks: [
+    { href: '/orders', label: 'Orders' },
+    { href: '/refunds', label: 'Refunds' },
+    { href: '/inventory', label: 'Inventory' },
+    { href: '/profile', label: 'Profile' },
+    { href: '/logout', label: 'Logout' }
+  ]
+}) %>
+
+<style>
+  .page-shell { max-width: 980px; margin: 32px auto 48px; padding: 0 16px; }
+  .panel { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 12px 32px rgba(16,24,40,0.08); padding: 24px; }
+  .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill-pending { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+  .pill-approved { background: #ecfeff; color: #0e7490; border: 1px solid #a5f3fc; }
+  .pill-rejected { background: #fef2f2; color: #991b1b; border: 1px solid #fecdd3; }
+</style>
+
+<div class="page-shell">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h2 class="mb-0">Refund Request #<%= report.id %></h2>
+      <p class="text-muted mb-0">Review request details and resolve.</p>
+    </div>
+    <a href="/refunds" class="btn btn-outline-primary btn-sm">Back to refunds</a>
+  </div>
+
+  <% if (messages && messages.error && messages.error.length) { %>
+    <div class="alert alert-danger">
+      <% messages.error.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+  <% if (messages && messages.success && messages.success.length) { %>
+    <div class="alert alert-success">
+      <% messages.success.forEach(function(msg){ %><div><%= msg %></div><% }); %>
+    </div>
+  <% } %>
+
+  <div class="panel mb-3">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="text-muted small">Order</div>
+        <div class="fw-semibold">Order #<%= report.orderId %></div>
+        <div class="small text-muted">Total: $<%= Number(report.orderTotal || 0).toFixed(2) %></div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">User</div>
+        <div class="fw-semibold"><%= report.username || ('User #' + report.userId) %></div>
+        <div class="small text-muted"><%= report.email || '' %></div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">Type</div>
+        <div class="fw-semibold"><%= report.supportType === 'partial_refund' ? 'Partial refund' : 'Full refund' %></div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">Status</div>
+        <% const status = (report.status || 'pending'); %>
+        <% if (status === 'pending') { %>
+          <span class="pill pill-pending">Pending</span>
+        <% } else if (status.startsWith('approved')) { %>
+          <span class="pill pill-approved"><%= status.replace('approved_', 'approved ') %></span>
+        <% } else { %>
+          <span class="pill pill-rejected">Rejected</span>
+        <% } %>
+      </div>
+      <div class="col-12">
+        <div class="text-muted small">Reason</div>
+        <div class="fw-semibold"><%= report.reason %></div>
+      </div>
+      <div class="col-12">
+        <div class="text-muted small">Description</div>
+        <div><%= report.description || 'N/A' %></div>
+      </div>
+      <div class="col-12">
+        <div class="text-muted small">Evidence</div>
+        <% if (report.image) { %>
+          <img src="/reports/<%= report.image %>" alt="evidence" style="width: 160px; height: 160px; object-fit: cover;" loading="lazy">
+        <% } else { %>
+          <div class="text-muted">None</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h4 class="mb-3">Resolve Request</h4>
+    <form id="refund-resolve-form" action="/refunds/<%= report.id %>/resolve" method="POST" class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label" for="supportType">Refund Type</label>
+        <select id="supportType" name="supportType" class="form-select">
+          <option value="full_refund" <%= report.supportType === 'full_refund' ? 'selected' : '' %>>Full refund</option>
+          <option value="partial_refund" <%= report.supportType === 'partial_refund' ? 'selected' : '' %>>Partial refund</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="status">Status</label>
+        <select id="status" name="status" class="form-select">
+          <option value="pending" <%= report.status === 'pending' ? 'selected' : '' %>>Pending</option>
+          <option value="approved_full" <%= report.status === 'approved_full' ? 'selected' : '' %>>Approve - Full</option>
+          <option value="approved_partial" <%= report.status === 'approved_partial' ? 'selected' : '' %>>Approve - Partial</option>
+          <option value="rejected" <%= report.status === 'rejected' ? 'selected' : '' %>>Reject</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="refundAmount">Refund Amount</label>
+        <input id="refundAmount" type="number" step="0.01" min="0" name="refundAmount" class="form-control" placeholder="Refund amount" value="<%= report.refundAmount || '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="resolutionNote">Resolution Note</label>
+        <input id="resolutionNote" type="text" name="resolutionNote" class="form-control" placeholder="Required for rejection" value="<%= report.resolutionNote || '' %>">
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="/refunds" class="btn btn-outline-secondary">Back</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const statusEl = document.getElementById('status');
+    const noteEl = document.getElementById('resolutionNote');
+    const setNoteRequired = () => {
+      const isReject = statusEl && statusEl.value === 'rejected';
+      if (noteEl) {
+        noteEl.required = !!isReject;
+      }
+    };
+    if (statusEl) {
+      statusEl.addEventListener('change', setNoteRequired);
+      setNoteRequired();
+    }
+  })();
+</script>
+
+<%- include('partials/footer') %>

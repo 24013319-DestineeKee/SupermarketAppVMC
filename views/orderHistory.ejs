@@ -65,9 +65,12 @@
               <td>#<%= order.id %></td>
               <td><span class="badge bg-secondary text-uppercase"><%= order.status || 'pending' %></span></td>
               <td>
+                <% const refundStatus = order.refund ? String(order.refund.status || '') : ''; %>
+                <% const refundCompleted = refundStatus === 'approved_full' || refundStatus === 'approved_partial'; %>
                 <% if (order.refund) { %>
-                  <span class="badge bg-info text-dark text-uppercase"><%= order.refund.status %></span>
-                  <% if (order.refund.refundAmount) { %>
+                  <% const displayStatus = (refundStatus || 'pending').replace('approved_', 'approved '); %>
+                  <a class="badge bg-info text-dark text-uppercase text-decoration-none" href="/my-refunds/<%= order.id %>"><%= displayStatus %></a>
+                  <% if (!refundCompleted && order.refund.refundAmount) { %>
                     <div class="small text-muted">$<%= Number(order.refund.refundAmount || 0).toFixed(2) %></div>
                   <% } %>
                 <% } else { %>
@@ -89,7 +92,9 @@
                     <button type="submit" class="btn btn-sm btn-success">Confirm Delivery</button>
                   </form>
                 <% } %>
-                <a class="btn btn-sm btn-warning" href="/orders/<%= order.id %>/report">Ask for refund</a>
+                <% if (!refundCompleted) { %>
+                  <a class="btn btn-sm btn-warning" href="/orders/<%= order.id %>/report">Ask for refund</a>
+                <% } %>
               </td>
             </tr>
             <tr class="collapse" id="my-items-<%= order.id %>">

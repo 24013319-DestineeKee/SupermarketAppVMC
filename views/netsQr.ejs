@@ -43,12 +43,11 @@
       <ol class="ps-3 mb-3">
         <li>Open your mobile banking app that supports NETS QR.</li>
         <li>Scan the QR code above and confirm the payment of S$<%= total %>.</li>
-        <li>After payment is successful, return to the shop or wait for confirmation.</li>
+        <li>After your payment appears as successful, please wait for confirmation.</li>
         <li>If it expires, refresh to generate a new code.</li>
       </ol>
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <a class="btn btn-outline-secondary" href="/cart">Back to cart</a>
-        <a class="btn btn-primary" href="/shopping">Continue shopping</a>
       </div>
     </div>
   </div>
@@ -70,9 +69,30 @@
       setTimeout(tick, 1000);
     };
     setTimeout(tick, 1000);
+
+    const pollStatus = async () => {
+      try {
+        const res = await fetch('/nets/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.status === 'pending') {
+          return;
+        }
+        if (!res.ok || data.ok === false) {
+          window.location.href = data.redirect || '/checkout';
+          return;
+        }
+        window.location.href = data.redirect || `/invoice/${data.orderId}`;
+      } catch (err) {
+        // silent retry
+      }
+    };
+
+    setInterval(pollStatus, 4000);
   })();
 </script>
 
 <%- include('partials/footer') %>
-
 

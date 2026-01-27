@@ -39,14 +39,22 @@
         <% if (membership) { %>
           <div class="alert alert-success d-flex justify-content-between align-items-center">
             <div>You are a member. Earn points on every purchase.</div>
-            <form action="/membership/toggle" method="POST" class="mb-0">
+            <form action="/membership/toggle" method="POST" class="d-flex gap-2 align-items-end mb-0">
               <input type="hidden" name="action" value="cancel">
+              <div>
+                <label class="form-label mb-1 small" for="membershipPasswordCancel">Password</label>
+                <input class="form-control form-control-sm" type="password" id="membershipPasswordCancel" name="currentPassword" placeholder="Confirm password" required>
+              </div>
               <button type="submit" class="btn btn-outline-light btn-sm">Cancel membership</button>
             </form>
           </div>
         <% } else { %>
-          <form action="/membership/toggle" method="POST" class="mb-3">
+          <form action="/membership/toggle" method="POST" class="d-flex gap-2 align-items-end mb-3">
             <input type="hidden" name="action" value="join">
+            <div>
+              <label class="form-label mb-1 small" for="membershipPasswordJoin">Password</label>
+              <input class="form-control form-control-sm" type="password" id="membershipPasswordJoin" name="currentPassword" placeholder="Confirm password" required>
+            </div>
             <button type="submit" class="btn btn-success">Add membership</button>
           </form>
         <% } %>
@@ -61,10 +69,6 @@
           <input class="form-control" type="email" id="email" name="email" value="<%= profileUser.email %>" required>
         </div>
         <div class="mb-3">
-          <label class="form-label" for="currentPassword">Current Password</label>
-          <input class="form-control" type="password" id="currentPassword" name="currentPassword" placeholder="Enter current password to confirm changes" required>
-        </div>
-        <div class="mb-3">
           <label class="form-label" for="password">New Password (optional)</label>
           <input class="form-control" type="password" id="password" name="password" placeholder="Leave blank to keep current password">
           <div class="form-text">Must be at least 6 characters if provided.</div>
@@ -76,6 +80,11 @@
         <div class="mb-4">
           <label class="form-label" for="contact">Contact</label>
           <input class="form-control" type="text" id="contact" name="contact" value="<%= profileUser.contact || '' %>">
+        </div>
+        <div class="mb-4">
+          <label class="form-label" for="currentPassword">Current Password</label>
+          <input class="form-control" type="password" id="currentPassword" name="currentPassword" placeholder="Enter current password to save changes">
+          <div class="form-text">Required only when you make changes.</div>
         </div>
         <div class="d-flex gap-2">
           <button type="submit" class="btn btn-primary">Save Changes</button>

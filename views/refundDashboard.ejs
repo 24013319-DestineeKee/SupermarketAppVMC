@@ -54,7 +54,7 @@
               <th>Evidence</th>
               <th>Type</th>
               <th>Status</th>
-              <th>Resolve</th>
+              <th>Details</th>
             </tr>
           </thead>
           <tbody>
@@ -90,9 +90,9 @@
                 <td>
                   <% const status = (report.status || 'pending'); %>
                   <% if (status === 'pending') { %>
-                    <span class="pill pill-pending">Pending</span>
+                    <a class="pill pill-pending text-decoration-none" href="/refunds/<%= report.id %>">Pending</a>
                   <% } else if (status.startsWith('approved')) { %>
-                    <span class="pill pill-approved"><%= status.replace('approved_', 'Approved ') %></span>
+                    <span class="pill pill-approved"><%= status.replace('approved_', 'approved ') %></span>
                   <% } else { %>
                     <span class="pill pill-rejected">Rejected</span>
                   <% } %>
@@ -104,17 +104,7 @@
                   <% } %>
                 </td>
                 <td>
-                  <form action="/refunds/<%= report.id %>/resolve" method="POST" class="d-flex flex-column gap-2">
-                    <select name="status" class="form-select form-select-sm">
-                      <option value="pending" <%= report.status === 'pending' ? 'selected' : '' %>>Pending</option>
-                      <option value="approved_full" <%= report.status === 'approved_full' ? 'selected' : '' %>>Approve - Full</option>
-                      <option value="approved_partial" <%= report.status === 'approved_partial' ? 'selected' : '' %>>Approve - Partial</option>
-                      <option value="rejected" <%= report.status === 'rejected' ? 'selected' : '' %>>Reject</option>
-                    </select>
-                    <input type="number" step="0.01" min="0" name="refundAmount" class="form-control form-control-sm" placeholder="Refund amount" value="<%= report.refundAmount || '' %>">
-                    <input type="text" name="resolutionNote" class="form-control form-control-sm" placeholder="Resolution note" value="<%= report.resolutionNote || '' %>">
-                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
-                  </form>
+                  <a class="btn btn-outline-primary btn-sm" href="/refunds/<%= report.id %>">View</a>
                 </td>
               </tr>
             <% }); %>
