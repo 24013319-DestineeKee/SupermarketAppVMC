@@ -88,20 +88,12 @@
   <div class="panel">
     <h4 class="mb-3">Resolve Request</h4>
     <form id="refund-resolve-form" action="/refunds/<%= report.id %>/resolve" method="POST" class="row g-3">
+      <input type="hidden" id="status" name="status" value="<%= report.status || 'pending' %>">
       <div class="col-md-4">
         <label class="form-label" for="supportType">Refund Type</label>
         <select id="supportType" name="supportType" class="form-select">
           <option value="full_refund" <%= report.supportType === 'full_refund' ? 'selected' : '' %>>Full refund</option>
           <option value="partial_refund" <%= report.supportType === 'partial_refund' ? 'selected' : '' %>>Partial refund</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label" for="status">Status</label>
-        <select id="status" name="status" class="form-select">
-          <option value="pending" <%= report.status === 'pending' ? 'selected' : '' %>>Pending</option>
-          <option value="approved_full" <%= report.status === 'approved_full' ? 'selected' : '' %>>Approve - Full</option>
-          <option value="approved_partial" <%= report.status === 'approved_partial' ? 'selected' : '' %>>Approve - Partial</option>
-          <option value="rejected" <%= report.status === 'rejected' ? 'selected' : '' %>>Reject</option>
         </select>
       </div>
       <div class="col-md-4">
@@ -113,7 +105,8 @@
         <input id="resolutionNote" type="text" name="resolutionNote" class="form-control" placeholder="Required for rejection" value="<%= report.resolutionNote || '' %>">
       </div>
       <div class="col-12 d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" id="approve-btn" class="btn btn-success">Accept refund</button>
+        <button type="button" id="reject-btn" class="btn btn-danger">Reject refund</button>
         <a href="/refunds" class="btn btn-outline-secondary">Back</a>
       </div>
     </form>
@@ -123,17 +116,46 @@
 <script>
   (() => {
     const statusEl = document.getElementById('status');
+    const supportTypeEl = document.getElementById('supportType');
     const noteEl = document.getElementById('resolutionNote');
+    const approveBtn = document.getElementById('approve-btn');
+    const rejectBtn = document.getElementById('reject-btn');
     const setNoteRequired = () => {
       const isReject = statusEl && statusEl.value === 'rejected';
       if (noteEl) {
         noteEl.required = !!isReject;
       }
     };
-    if (statusEl) {
-      statusEl.addEventListener('change', setNoteRequired);
+    const setApproveStatus = () => {
+      if (!statusEl || !supportTypeEl) return;
+      statusEl.value = supportTypeEl.value === 'partial_refund' ? 'approved_partial' : 'approved_full';
       setNoteRequired();
+    };
+    const setRejectStatus = () => {
+      if (!statusEl) return;
+      statusEl.value = 'rejected';
+      setNoteRequired();
+    };
+    if (approveBtn) {
+      approveBtn.addEventListener('click', () => {
+        setApproveStatus();
+        document.getElementById('refund-resolve-form').submit();
+      });
     }
+    if (rejectBtn) {
+      rejectBtn.addEventListener('click', () => {
+        setRejectStatus();
+        document.getElementById('refund-resolve-form').submit();
+      });
+    }
+    if (supportTypeEl) {
+      supportTypeEl.addEventListener('change', () => {
+        if (statusEl && statusEl.value.startsWith('approved')) {
+          setApproveStatus();
+        }
+      });
+    }
+    setNoteRequired();
   })();
 </script>
 
