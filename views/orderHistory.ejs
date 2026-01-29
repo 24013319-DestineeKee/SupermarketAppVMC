@@ -17,7 +17,17 @@
   .table-card { overflow: hidden; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 10px 26px rgba(16,24,40,0.06); }
   .table-card thead { background: #f8fafc; font-weight: 600; }
   .table-card tbody tr:hover { background: #f1f5f9; }
-  .empty-state { text-align: center; padding: 24px; border: 1px dashed #d7dce3; border-radius: 12px; color: #6b7280; background: #fff; }
+  .actions-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+  .actions-cell form { margin: 0; }
+  .actions-cell .btn { white-space: nowrap; }
+  .table-card tbody tr.collapse > td { padding: 0 !important; border: 0 !important; }
+  .table-card tbody tr.collapse:not(.show) { height: 0 !important; }
+  .table-card tbody tr.collapse { display: none !important; }
+  .table-card tbody tr.collapse.show { display: table-row !important; }
+  .table-card tbody tr.collapsing { display: none !important; }
+  .table-card tbody tr.collapse { visibility: collapse; }
+  .table-card tbody tr.collapse.show { visibility: visible; }
+  .table-card .table > :not(caption) > * > * { padding-top: 0.6rem; padding-bottom: 0.6rem; }
   .refund-status-btn:hover,
   .refund-status-btn:focus {
     background-color: inherit;
@@ -51,20 +61,6 @@
     </div>
   <% } %>
 
-  <% if (orders && orders.length) { %>
-    <% orders.forEach(function(order){ %>
-      <% if (order.refund && (order.refund.status === 'approved_full' || order.refund.status === 'approved_partial')) { %>
-        <div class="alert alert-success">
-          Refund approved (<%= order.refund.supportType === 'partial_refund' ? 'partial' : 'full' %>) for Order #<%= order.id %>: $<%= Number(order.refund.refundAmount || 0).toFixed(2) %>.
-        </div>
-      <% } else if (order.refund && order.refund.status === 'rejected') { %>
-        <div class="alert alert-danger">
-          Refund rejected for Order #<%= order.id %>: <%= order.refund.resolutionNote || 'No reason provided.' %>
-        </div>
-      <% } %>
-    <% }); %>
-  <% } %>
-
   <% if (!orders || !orders.length) { %>
     <div class="empty-state">You have no orders yet.</div>
   <% } else { %>
@@ -73,6 +69,9 @@
         <thead>
           <tr>
             <th>ID</th>
+            <th>Payment Type</th>
+            <th>Transaction ID</th>
+            <th>Reference ID</th>
             <th>Status</th>
             <th>Refund</th>
             <th>Total</th>
@@ -84,13 +83,18 @@
           <% orders.forEach(function(order){ %>
             <tr>
               <td>#<%= order.id %></td>
-              <td><span class="badge bg-secondary text-uppercase"><%= order.status || 'pending' %></span></td>
+              <td><%= order.paymentMethod || 'N/A' %></td>
+              <td><code><%= order.transactionId || 'N/A' %></code></td>
+              <td><code><%= order.transactionRefId || 'N/A' %></code></td>
+              <% const orderStatusRaw = (order.status || 'pending'); %>
+              <% const statusLabel = orderStatusRaw === 'credit_refunded' ? 'Credit Refunded' : orderStatusRaw; %>
+              <td><span class="badge bg-secondary text-uppercase"><%= statusLabel %></span></td>
               <td>
                 <% const refundStatus = order.refund ? String(order.refund.status || '') : ''; %>
                 <% const refundCompleted = refundStatus === 'approved_full' || refundStatus === 'approved_partial'; %>
                 <% if (order.refund) { %>
                   <% const displayStatus = (refundStatus || 'pending').replace('approved_', 'approved '); %>
-                  <a class="btn btn-sm btn-outline-info text-uppercase text-decoration-none refund-status-btn" href="/my-refunds/<%= order.id %>"><%= displayStatus %></a>
+                  <a class="btn btn-sm btn-info text-uppercase text-decoration-none refund-status-btn" href="/my-refunds/<%= order.id %>"><%= displayStatus %></a>
                   <% if (refundCompleted) { %>
                     <div class="small text-muted">
                       Approved <%= (order.refund.supportType === 'partial_refund' ? 'partial' : 'full') %> refund: $<%= Number(order.refund.refundAmount || 0).toFixed(2) %>
@@ -111,9 +115,9 @@
                   <%= count %> item<%= count === 1 ? '' : 's' %>
                 </button>
               </td>
-              <td class="d-flex gap-2">
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#my-items-<%= order.id %>">Details</button>
-                <a class="btn btn-sm btn-outline-primary" href="/invoice/<%= order.id %>">Invoice</a>
+              <td class="actions-cell">
+                <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#my-items-<%= order.id %>">Details</button>
+                <a class="btn btn-sm btn-primary" href="/invoice/<%= order.id %>">Invoice</a>
                 <% if ((order.status || '').toLowerCase() !== 'completed') { %>
                   <form action="/orders/<%= order.id %>/complete" method="POST" onsubmit="return confirm('Mark this order as completed?');">
                     <button type="submit" class="btn btn-sm btn-success">Confirm Delivery</button>
@@ -125,7 +129,7 @@
               </td>
             </tr>
             <tr class="collapse" id="my-items-<%= order.id %>">
-              <td colspan="6">
+              <td colspan="9">
                 <% if (!order.items || !order.items.length) { %>
                   <div class="text-muted">No items.</div>
                 <% } else { %>

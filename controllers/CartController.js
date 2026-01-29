@@ -4,6 +4,9 @@ const OrderModel = require('../models/order');
 const PaypalService = require('../services/paypal');
 const StripeService = require('../services/stripe');
 const MembershipModel = require('../models/membership');
+const RefundCreditModel = require('../models/refundCredit');
+
+const buildLocalTransactionId = (prefix = 'CARD') => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
 const parsePositiveInt = (value) => {
   const n = parseInt(value, 10);
@@ -97,7 +100,7 @@ const computeCheckoutState = (user, formData, loyaltyRedemption, callback) => {
       const discountedTotal = Number((cartTotal * (1 - discountPercent / 100)).toFixed(2));
       const firstOrderDiscount = Math.max(0, Number((cartTotal - discountedTotal).toFixed(2)));
       const loyaltyUsage = computeLoyaltyUsage(loyaltyRedemption, discountedTotal);
-      const payableTotal = Number((Math.max(0, discountedTotal - loyaltyUsage.discountAmount)).toFixed(2));
+      const maxAfterLoyalty = Math.max(0, discountedTotal - loyaltyUsage.discountAmount);
 
       const orderItems = cart.map((item) => ({
         productId: item.productId,
@@ -114,17 +117,26 @@ const computeCheckoutState = (user, formData, loyaltyRedemption, callback) => {
         email: (formData && formData.email) || user.email || ''
       };
 
-      callback(null, {
-        cart,
-        cartTotal,
-        discountedTotal,
-        discountPercent,
-        discountAmount: firstOrderDiscount,
-        loyaltyDiscount: loyaltyUsage.discountAmount,
-        loyaltyPoints: loyaltyUsage.pointsUsed,
-        payableTotal,
-        orderItems,
-        checkoutDetails
+      RefundCreditModel.getLatestAvailableByUser(userId, (creditErr, credit) => {
+        if (creditErr) console.error('Error loading refund credit', creditErr);
+        const availableCredit = credit && Number(credit.amount) ? Number(credit.amount) : 0;
+        const refundCreditAmount = Number(Math.min(maxAfterLoyalty, Math.max(0, availableCredit)).toFixed(2));
+        const payableTotal = Number((Math.max(0, maxAfterLoyalty - refundCreditAmount)).toFixed(2));
+
+        callback(null, {
+          cart,
+          cartTotal,
+          discountedTotal,
+          discountPercent,
+          discountAmount: firstOrderDiscount,
+          loyaltyDiscount: loyaltyUsage.discountAmount,
+          loyaltyPoints: loyaltyUsage.pointsUsed,
+          refundCreditAmount,
+          refundCreditId: credit ? credit.id : null,
+          payableTotal,
+          orderItems,
+          checkoutDetails
+        });
       });
     });
   });
@@ -160,7 +172,12 @@ const persistOrder = (orderPayload, callback) => {
     checkoutDetails,
     discountAmount,
     loyaltyDiscount,
-    loyaltyPoints
+    loyaltyPoints,
+    transactionId,
+    transactionRefId,
+    paymentMethod,
+    refundCreditAmount,
+    refundCreditId
   } = orderPayload;
   const payload = {
     userId,
@@ -168,6 +185,15 @@ const persistOrder = (orderPayload, callback) => {
     discountPercent: discountPercent || 0,
     status: 'processing'
   };
+  if (transactionId) {
+    payload.transactionId = transactionId;
+  }
+  if (transactionRefId) {
+    payload.transactionRefId = transactionRefId;
+  }
+  if (paymentMethod) {
+    payload.paymentMethod = paymentMethod;
+  }
 
   OrderModel.createOrder(payload, orderItems, (orderErr, result) => {
     if (orderErr) return callback(orderErr);
@@ -213,7 +239,15 @@ const persistOrder = (orderPayload, callback) => {
         });
       });
 
-      Promise.all([decrementStockForOrder(orderItems), membershipTask])
+      const creditTask = new Promise((resolve) => {
+        if (!refundCreditId || !refundCreditAmount || Number(refundCreditAmount) <= 0) return resolve();
+        RefundCreditModel.markUsed(refundCreditId, orderId, (cErr) => {
+          if (cErr) console.error('Error marking refund credit used', cErr);
+          resolve();
+        });
+      });
+
+      Promise.all([decrementStockForOrder(orderItems), membershipTask, creditTask])
         .catch((err) => console.error('Post-order error:', err))
         .finally(() => {
           CartModel.clearCartByUser(userId, (clearErr) => {
@@ -225,9 +259,10 @@ const persistOrder = (orderPayload, callback) => {
             checkoutDetails,
             discountAmount: discountAmount || 0,
             loyaltyDiscount: loyaltyDiscount || 0,
-            loyaltyPoints: loyaltyPoints || 0
-          });
+            loyaltyPoints: loyaltyPoints || 0,
+          refundCreditAmount: refundCreditAmount || 0
         });
+      });
     };
 
     OrderModel.getOrderById(orderId, (fetchErr, order) => {
@@ -237,6 +272,8 @@ const persistOrder = (orderPayload, callback) => {
           userId,
           totalAmount,
           status: 'processing',
+          transactionId: transactionId || null,
+          transactionRefId: transactionRefId || null,
           items: orderItems
         };
         return finalize(fallbackOrder);
@@ -244,6 +281,8 @@ const persistOrder = (orderPayload, callback) => {
 
       const enriched = {
         ...order,
+        transactionId: order.transactionId || transactionId || null,
+        transactionRefId: order.transactionRefId || transactionRefId || null,
         totalAmount,
         items: order.items.map((it) => {
           const fromCart = orderItems.find((ci) => ci.productId === it.productId);
@@ -317,6 +356,7 @@ const CartController = {
           discountPercent: checkout.discountPercent,
           loyaltyDiscount: checkout.loyaltyDiscount,
           loyaltyPoints: checkout.loyaltyPoints,
+          refundCreditAmount: checkout.refundCreditAmount,
           payableTotal: checkout.payableTotal,
           user: req.session.user,
           formData,
@@ -362,20 +402,24 @@ const CartController = {
       const loyaltySummary = checkout.loyaltyPoints
         ? `${checkout.loyaltyPoints} points redeemed for $${checkout.loyaltyDiscount.toFixed(2)} discount`
         : '';
-      const payload = {
-        userId: req.session.user.id,
-        totalAmount: checkout.payableTotal,
-        discountPercent: checkout.discountPercent,
-        orderItems: checkout.orderItems,
-        checkoutDetails: {
-          ...checkout.checkoutDetails,
-          discountApplied: checkout.discountPercent > 0 ? '25% first order discount applied' : '',
-          loyaltyApplied: loyaltySummary
-        },
-        discountAmount: checkout.discountAmount,
-        loyaltyDiscount: checkout.loyaltyDiscount,
-        loyaltyPoints: checkout.loyaltyPoints
-      };
+        const payload = {
+          userId: req.session.user.id,
+          totalAmount: checkout.payableTotal,
+          discountPercent: checkout.discountPercent,
+          orderItems: checkout.orderItems,
+          checkoutDetails: {
+            ...checkout.checkoutDetails,
+            discountApplied: checkout.discountPercent > 0 ? '25% first order discount applied' : '',
+            loyaltyApplied: loyaltySummary
+          },
+          paymentMethod: 'CARD',
+          refundCreditAmount: checkout.refundCreditAmount,
+          refundCreditId: checkout.refundCreditId,
+          transactionId: buildLocalTransactionId('CARD'),
+          discountAmount: checkout.discountAmount,
+          loyaltyDiscount: checkout.loyaltyDiscount,
+          loyaltyPoints: checkout.loyaltyPoints
+        };
 
       persistOrder(payload, (orderErr, orderResult) => {
         if (orderErr) {
@@ -392,6 +436,7 @@ const CartController = {
           discountAmount: orderResult.discountAmount,
           loyaltyDiscount: orderResult.loyaltyDiscount,
           loyaltyPoints: orderResult.loyaltyPoints,
+          refundCreditAmount: orderResult.refundCreditAmount,
           user: req.session.user
         });
       });
@@ -429,12 +474,16 @@ const CartController = {
         discountAmount: checkout.discountAmount,
         loyaltyDiscount: checkout.loyaltyDiscount,
         loyaltyPoints: checkout.loyaltyPoints,
+        paymentMethod: 'PAYPAL',
+        refundCreditAmount: checkout.refundCreditAmount,
+        refundCreditId: checkout.refundCreditId,
         checkoutDetails: {
           ...checkout.checkoutDetails,
           discountApplied: checkout.discountPercent > 0 ? '25% first order discount applied' : '',
           loyaltyApplied: checkout.loyaltyPoints ? `${checkout.loyaltyPoints} points redeemed for $${checkout.loyaltyDiscount.toFixed(2)} discount` : ''
         },
         paypalOrderId: paypalOrder.id,
+        transactionId: paypalOrder.id,
         createdAt: Date.now()
       };
 
@@ -473,15 +522,21 @@ const CartController = {
         return res.status(400).json({ error: `Payment not completed (status: ${captureStatus}).` });
       }
 
+      const captureId = capture?.purchase_units?.[0]?.payments?.captures?.[0]?.id;
       const payload = {
         userId: req.session.user.id,
         totalAmount: pending.totalAmount,
         discountPercent: pending.discountPercent,
         orderItems: pending.orderItems,
         checkoutDetails: pending.checkoutDetails,
+        transactionId: pending.transactionId || pending.paypalOrderId,
+        transactionRefId: captureId || null,
+        paymentMethod: pending.paymentMethod || 'PAYPAL',
         discountAmount: pending.discountAmount,
         loyaltyDiscount: pending.loyaltyDiscount,
-        loyaltyPoints: pending.loyaltyPoints
+        loyaltyPoints: pending.loyaltyPoints,
+        refundCreditAmount: pending.refundCreditAmount,
+        refundCreditId: pending.refundCreditId
       };
 
       persistOrder(payload, (orderErr, orderResult) => {
@@ -538,12 +593,16 @@ const CartController = {
         discountAmount: checkout.discountAmount,
         loyaltyDiscount: checkout.loyaltyDiscount,
         loyaltyPoints: checkout.loyaltyPoints,
+        paymentMethod: 'STRIPE',
+        refundCreditAmount: checkout.refundCreditAmount,
+        refundCreditId: checkout.refundCreditId,
         checkoutDetails: {
           ...checkout.checkoutDetails,
           discountApplied: checkout.discountPercent > 0 ? '25% first order discount applied' : '',
           loyaltyApplied: checkout.loyaltyPoints ? `${checkout.loyaltyPoints} points redeemed for $${checkout.loyaltyDiscount.toFixed(2)} discount` : ''
         },
         stripePaymentIntentId: intent.id,
+        transactionId: intent.id,
         createdAt: Date.now()
       };
 
@@ -575,9 +634,9 @@ const CartController = {
     }
 
     try {
-      const status = await StripeService.getPaymentStatus(paymentIntentId);
-      if (status !== 'succeeded') {
-        return res.status(400).json({ error: `Payment not completed (status: ${status}).` });
+      const details = await StripeService.getPaymentIntentDetails(paymentIntentId);
+      if (details.status !== 'succeeded') {
+        return res.status(400).json({ error: `Payment not completed (status: ${details.status}).` });
       }
 
       const payload = {
@@ -586,9 +645,14 @@ const CartController = {
         discountPercent: pending.discountPercent,
         orderItems: pending.orderItems,
         checkoutDetails: pending.checkoutDetails,
+        transactionId: pending.transactionId || pending.stripePaymentIntentId,
+        transactionRefId: details.chargeId || null,
+        paymentMethod: pending.paymentMethod || 'STRIPE',
         discountAmount: pending.discountAmount,
         loyaltyDiscount: pending.loyaltyDiscount,
-        loyaltyPoints: pending.loyaltyPoints
+        loyaltyPoints: pending.loyaltyPoints,
+        refundCreditAmount: pending.refundCreditAmount,
+        refundCreditId: pending.refundCreditId
       };
 
       persistOrder(payload, (orderErr, orderResult) => {

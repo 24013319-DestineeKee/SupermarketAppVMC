@@ -3,6 +3,7 @@ const OrderModel = require('../models/order');
 const ProductModel = require('../models/product');
 const MembershipModel = require('../models/membership');
 const NetsService = require('../services/nets');
+const RefundCreditModel = require('../models/refundCredit');
 
 const mapCartItems = (items) => {
   const cart = items.map((item) => {
@@ -38,11 +39,21 @@ const computeTotals = (userId) => new Promise((resolve, reject) => {
       const discountPercent = discountEligible ? 25 : 0;
       const discountedTotal = discountPercent > 0 ? Number((cartTotal * 0.75).toFixed(2)) : cartTotal;
 
-      resolve({
-        cart,
-        cartTotal,
-        discountedTotal,
-        discountPercent
+      RefundCreditModel.getLatestAvailableByUser(userId, (creditErr, credit) => {
+        if (creditErr) console.error('Error loading refund credit', creditErr);
+        const availableCredit = credit && Number(credit.amount) ? Number(credit.amount) : 0;
+        const refundCreditAmount = Number(Math.min(discountedTotal, Math.max(0, availableCredit)).toFixed(2));
+        const payableTotal = Number((Math.max(0, discountedTotal - refundCreditAmount)).toFixed(2));
+
+        resolve({
+          cart,
+          cartTotal,
+          discountedTotal,
+          discountPercent,
+          refundCreditAmount,
+          refundCreditId: credit ? credit.id : null,
+          payableTotal
+        });
       });
     });
   });
@@ -114,6 +125,10 @@ const NetsController = {
       }
 
       const status = normalizeStatus(statusResp?.txnStatus, statusResp?.responseCode);
+      const statusTxnRefId = statusResp?.txnRefId
+        || statusResp?.raw?.result?.data?.txn_ref_id
+        || statusResp?.raw?.result?.data?.txnRefId
+        || statusResp?.raw?.result?.data?.txn_ref;
       const elapsedMs = txn.createdAt ? Date.now() - txn.createdAt : 0;
       const optimisticAfterMs = 20000;
       if (status !== 'success' && elapsedMs < optimisticAfterMs) {
@@ -126,7 +141,14 @@ const NetsController = {
         return res.redirect('/checkout');
       }
 
-      const { cart, discountedTotal, discountPercent } = await computeTotals(userId);
+      const {
+        cart,
+        discountedTotal,
+        discountPercent,
+        refundCreditAmount,
+        refundCreditId,
+        payableTotal
+      } = await computeTotals(userId);
       if (!cart || cart.length === 0) {
         if (wantsJson) {
           return res.status(400).json({ ok: false, status: 'failed', error: 'Your cart is empty.', redirect: '/checkout' });
@@ -143,11 +165,18 @@ const NetsController = {
         image: item.image
       }));
 
+      const txnRefId = txn.txnRefId || statusTxnRefId;
+      const txnId = txn.txnId || statusResp?.txnId || statusResp?.raw?.result?.data?.txn_id;
       const payload = {
         userId,
-        totalAmount: discountedTotal,
+        totalAmount: payableTotal,
         discountPercent,
-        status: 'processing'
+        status: 'processing',
+        transactionId: txnRefId || txn.txnRetrievalRef,
+        transactionRefId: txnId || null,
+        paymentMethod: 'NETS',
+        refundCreditAmount,
+        refundCreditId
       };
 
       OrderModel.createOrder(payload, orderItems, (orderErr, result) => {
@@ -174,13 +203,21 @@ const NetsController = {
           return res.redirect(`/invoice/${orderId}`);
         };
 
-        Promise.all(decTasks)
+        const creditTask = new Promise((resolve) => {
+          if (!refundCreditId || !refundCreditAmount || Number(refundCreditAmount) <= 0) return resolve();
+          RefundCreditModel.markUsed(refundCreditId, orderId, (cErr) => {
+            if (cErr) console.error('Error marking refund credit used', cErr);
+            resolve();
+          });
+        });
+
+        Promise.all(decTasks.concat([creditTask]))
           .then(() => {
             if (req.session) delete req.session.netsTxn;
             CartModel.clearCartByUser(userId, (clearErr) => {
               if (clearErr) console.error('Error clearing cart after NETS payment:', clearErr);
             });
-            const points = Math.floor((Number(discountedTotal) || 0) * 10);
+            const points = Math.floor((Number(payableTotal) || 0) * 10);
             if (points <= 0) return finish();
             MembershipModel.getByUser(userId, (mErr, membership) => {
               if (mErr || !membership) return finish();
@@ -216,12 +253,12 @@ const NetsController = {
     }
 
     try {
-      const { cart, discountedTotal } = await computeTotals(userId);
+      const { cart, payableTotal, refundCreditAmount, refundCreditId } = await computeTotals(userId);
       if (!cart || cart.length === 0) {
         return handleFail(req, res, 'Your cart is empty.');
       }
 
-      const { qrData, courseInitId, webhookUrl, fullResponse } = await NetsService.requestQrCode(discountedTotal);
+      const { qrData, courseInitId, webhookUrl, fullResponse, txnId } = await NetsService.requestQrCode(payableTotal);
 
       if (
         qrData.response_code === '00' &&
@@ -229,18 +266,23 @@ const NetsController = {
         qrData.qr_code
       ) {
         const txnRetrievalRef = qrData.txn_retrieval_ref;
-        if (req.session) {
-          req.session.netsTxn = {
-            txnRetrievalRef,
-            courseInitId,
-            total: discountedTotal,
-            createdAt: Date.now()
-          };
-        }
+        const txnRefId = qrData.txn_ref_id || qrData.txnRefId || qrData.txn_ref;
+          if (req.session) {
+            req.session.netsTxn = {
+              txnRetrievalRef,
+              txnRefId,
+              txnId: txnId || null,
+              courseInitId,
+              total: payableTotal,
+              refundCreditAmount,
+              refundCreditId,
+              createdAt: Date.now()
+            };
+          }
 
         return res.render('netsQr', {
           title: 'Scan to Pay',
-          total: discountedTotal.toFixed(2),
+          total: payableTotal.toFixed(2),
           qrCodeUrl: `data:image/png;base64,${qrData.qr_code}`,
           user: req.session.user,
           txnRetrievalRef,

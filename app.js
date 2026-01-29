@@ -10,6 +10,7 @@ const UserModel = require('./models/user');
 const OrderModel = require('./models/order');
 const RefundModel = require('./models/refund');
 const MembershipModel = require('./models/membership');
+const RefundCreditModel = require('./models/refundCredit');
 const ProductController = require('./controllers/ProductController');
 const UserController = require('./controllers/UserController');
 const CartController = require('./controllers/CartController');
@@ -103,7 +104,8 @@ app.use((req, res, next) => {
   }
   res.locals.messages = {
     success: req.flash('success') || [],
-    error: req.flash('error') || []
+    error: req.flash('error') || [],
+    warning: req.flash('warning') || []
   };
   next();
 });
@@ -352,11 +354,16 @@ app.get('/shopping', checkAuthenticated, (req, res) => {
       if (req.session && req.session.user) {
         req.session.user.membership = !!membership;
       }
-      res.render('shopping', {
-        user: req.session.user,
-        products,
-        membership,
-        loyaltyRedemption: req.session.loyaltyRedemption || null
+      RefundCreditModel.getLatestAvailableByUser(userId, (cErr, credit) => {
+        if (cErr) console.error('Error loading refund credit for shopping', cErr);
+        const availableCredit = credit && Number(credit.amount) ? Number(credit.amount) : 0;
+        res.render('shopping', {
+          user: req.session.user,
+          products,
+          membership,
+          loyaltyRedemption: req.session.loyaltyRedemption || null,
+          refundCreditAmount: availableCredit
+        });
       });
     });
   });
@@ -383,18 +390,7 @@ app.get('/refunds/:id', checkAuthenticated, checkAdmin, RefundController.viewRep
 app.post('/refunds/:id/resolve', checkAuthenticated, checkAdmin, RefundController.resolveReport.bind(RefundController));
 app.get('/my-refunds/:orderId', checkAuthenticated, RefundController.viewUserReport.bind(RefundController));
 app.get('/membership', checkAuthenticated, (req, res) => {
-  MembershipModel.getByUser(req.session.user.id, (err, membership) => {
-    if (err) {
-      console.error('Error loading membership', err);
-      req.flash('error', 'Unable to load membership.');
-      return res.redirect('/shopping');
-    }
-    if (membership) {
-      req.flash('success', 'You are already a member.');
-      return res.redirect('/shopping');
-    }
-    res.render('membershipSignup', { user: req.session.user, messages: { error: req.flash('error'), success: req.flash('success') } });
-  });
+  res.redirect('/profile');
 });
 app.post('/membership/join', checkAuthenticated, (req, res) => {
   MembershipModel.createForUser(req.session.user.id, (err) => {
@@ -765,7 +761,7 @@ app.put('/api/products/:id', upload.single('image'), ProductController.updatePro
 app.delete('/api/products/:id', ProductController.deleteProduct);
 
 // --- start server ---
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 module.exports = app;

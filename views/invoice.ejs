@@ -40,7 +40,10 @@
         <p class="mb-1"><strong>Name:</strong> <%= checkout.fullName %></p>
         <p class="mb-1"><strong>Email:</strong> <%= checkout.email %></p>
         <p class="mb-1"><strong>Address:</strong><br><%= checkout.address || 'N/A' %></p>
-        <p class="mb-0"><strong>Contact:</strong> <%= checkout.contact || 'N/A' %></p>
+        <p class="mb-1"><strong>Contact:</strong> <%= checkout.contact || 'N/A' %></p>
+        <p class="mb-1"><strong>Payment Type:</strong> <%= (order && order.paymentMethod) || 'N/A' %></p>
+        <p class="mb-1"><strong>Transaction ID:</strong> <code><%= (order && order.transactionId) || 'N/A' %></code></p>
+        <p class="mb-0"><strong>Reference ID:</strong> <code><%= (order && order.transactionRefId) || 'N/A' %></code></p>
       </div>
     </div>
     <div class="col-md-6">
@@ -82,6 +85,12 @@
                 <% } %>
               </div>
               <span class="text-success">-$<%= Number(loyaltyDiscount).toFixed(2) %></span>
+            </div>
+          <% } %>
+          <% if (typeof refundCreditAmount !== 'undefined' && Number(refundCreditAmount) > 0) { %>
+            <div class="d-flex justify-content-between">
+              <span class="text-muted">Refund credit</span>
+              <span class="text-success">-$<%= Number(refundCreditAmount).toFixed(2) %></span>
             </div>
           <% } %>
           <div class="d-flex justify-content-between">

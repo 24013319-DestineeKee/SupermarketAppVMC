@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const OrderModel = require('../models/order');
 const RefundModel = require('../models/refund');
-const MembershipModel = require('../models/membership');
+const RefundCreditModel = require('../models/refundCredit');
 
 const ensureUploadsDir = () => {
   const dir = path.join(__dirname, '..', 'public', 'reports');
@@ -219,13 +219,7 @@ const RefundController = {
           return res.redirect('/refunds');
         }
         const orderStatus = (() => {
-          const currentStatus = String(report.orderStatus || '').toLowerCase();
-          const deliveryConfirmed = currentStatus === 'completed';
-          if ((status === 'approved_full' || status === 'approved_partial') && !deliveryConfirmed) {
-            return 'cancelled';
-          }
-          if (status === 'approved_full') return 'refund_full';
-          if (status === 'approved_partial') return 'refund_partial';
+          if (status === 'approved_full' || status === 'approved_partial') return 'credit_refunded';
           if (status === 'rejected') return 'refund_rejected';
           return null;
         })();
@@ -236,29 +230,26 @@ const RefundController = {
 
         OrderModel.updateStatus(report.orderId, orderStatus, (sErr) => {
           if (sErr) console.error('Error updating order status for refund', sErr);
-          const percent = status === 'approved_full' ? 0.25 : (status === 'approved_partial' ? 0.10 : 0);
-          const basePoints = Math.floor((Number(report.orderTotal || 0) * 10) || 0);
-          const bonus = Math.floor(basePoints * percent);
-          if (bonus <= 0) {
+          const approved = status === 'approved_full' || status === 'approved_partial';
+          if (!approved) {
             req.flash('success', 'Report updated.');
             return res.redirect('/refunds');
           }
-          // Only award bonus if user is a member
-          MembershipModel.getByUser(report.userId, (mErr, membership) => {
-            if (mErr) {
-              console.error('Error checking membership for refund bonus', mErr);
-              req.flash('success', 'Report updated.');
-              return res.redirect('/refunds');
-            }
-            if (!membership) {
-              req.flash('success', 'Report updated.');
-              return res.redirect('/refunds');
-            }
-            MembershipModel.addPoints(report.userId, bonus, (pErr) => {
-              if (pErr) console.error('Error adding membership points after refund', pErr);
-              req.flash('success', 'Report updated.');
-              return res.redirect('/refunds');
-            });
+
+          const creditAmount = Number(targetAmount || 0);
+          if (!Number.isFinite(creditAmount) || creditAmount <= 0) {
+            req.flash('success', 'Report updated.');
+            return res.redirect('/refunds');
+          }
+
+          RefundCreditModel.createCredit({
+            userId: report.userId,
+            refundRequestId: report.id,
+            amount: creditAmount
+          }, (cErr) => {
+            if (cErr) console.error('Error creating refund credit', cErr);
+            req.flash('warning', 'Credit Refunded');
+            return res.redirect('/refunds');
           });
         });
       });

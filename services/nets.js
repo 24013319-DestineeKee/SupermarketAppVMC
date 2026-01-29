@@ -17,11 +17,15 @@ const loadCourseInitId = () => {
   }
 };
 
-const buildRequestPayload = (amount) => ({
-  txn_id: process.env.NETS_TXN_ID || 'sandbox_nets|m|8ff8e5b6-d43e-4786-8ac5-7accf8c5bd9b',
-  amt_in_dollars: Number(amount).toFixed(2),
-  notify_mobile: 0
-});
+const buildRequestPayload = (amount) => {
+  const base = process.env.NETS_TXN_ID || 'sandbox_nets|m';
+  const unique = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  return {
+    txn_id: `${base}|${unique}`,
+    amt_in_dollars: Number(amount).toFixed(2),
+    notify_mobile: 0
+  };
+};
 
 const buildHeaders = () => ({
   'api-key': process.env.API_KEY,
@@ -55,6 +59,7 @@ const getPaymentStatus = async (txnRetrievalRef, frontendTimeoutStatus = 0) => {
   return {
     txnStatus: data.txn_status ?? data.txnStatus ?? data.status,
     responseCode: data.response_code || data.responseCode,
+    txnRefId: data.txn_ref_id || data.txnRefId || data.txn_ref,
     raw: response?.data
   };
 };
@@ -71,6 +76,7 @@ const requestQrCode = async (amount) => {
 
   return {
     qrData,
+    txnId: payload.txn_id,
     webhookUrl: buildWebhookUrl(qrData.txn_retrieval_ref, courseInitId),
     courseInitId,
     fullResponse: response.data

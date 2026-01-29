@@ -28,7 +28,23 @@ const getPaymentStatus = async (paymentIntentId) => {
   return intent?.status || 'unknown';
 };
 
+const getPaymentIntentDetails = async (paymentIntentId) => {
+  const client = getClient();
+  const intent = await client.paymentIntents.retrieve(paymentIntentId, {
+    expand: ['latest_charge']
+  });
+  const latestCharge = intent?.latest_charge;
+  const chargeId = typeof latestCharge === 'string'
+    ? latestCharge
+    : latestCharge?.id;
+  return {
+    status: intent?.status || 'unknown',
+    chargeId: chargeId || null
+  };
+};
+
 module.exports = {
   createPaymentIntent,
-  getPaymentStatus
+  getPaymentStatus,
+  getPaymentIntentDetails
 };

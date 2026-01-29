@@ -168,6 +168,12 @@
               <strong>-$<%= loyaltyDiscount.toFixed(2) %></strong>
             </div>
           <% } %>
+          <% if (typeof refundCreditAmount !== 'undefined' && refundCreditAmount > 0) { %>
+            <div class="summary-line text-info">
+              <strong>Refund credit</strong>
+              <strong>-$<%= refundCreditAmount.toFixed(2) %></strong>
+            </div>
+          <% } %>
           <div class="summary-line border-top pt-2">
             <strong>Total</strong>
             <strong>$<%= payableTotal.toFixed(2) %></strong>

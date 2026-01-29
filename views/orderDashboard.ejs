@@ -58,6 +58,9 @@
         <thead>
           <tr>
             <th>ID</th>
+            <th>Payment Type</th>
+            <th>Transaction ID</th>
+            <th>Reference ID</th>
             <th>User ID</th>
             <th>Status</th>
             <th>Refund</th>
@@ -71,8 +74,13 @@
           <% orders.forEach(function(order){ %>
             <tr>
               <td>#<%= order.id %></td>
+              <td><%= order.paymentMethod || 'N/A' %></td>
+              <td><code><%= order.transactionId || 'N/A' %></code></td>
+              <td><code><%= order.transactionRefId || 'N/A' %></code></td>
               <td><%= order.userId %></td>
-              <td><span class="badge bg-secondary text-uppercase"><%= order.status || 'pending' %></span></td>
+              <% const orderStatusRaw = (order.status || 'pending'); %>
+              <% const statusLabel = orderStatusRaw === 'credit_refunded' ? 'Credit Refunded' : orderStatusRaw; %>
+              <td><span class="badge bg-secondary text-uppercase"><%= statusLabel %></span></td>
               <td>
                 <% if (order.refund) { %>
                   <a class="btn btn-sm btn-outline-info text-uppercase text-decoration-none refund-status-btn" href="/refunds/<%= order.refund.id %>"><%= order.refund.status %></a>
@@ -96,7 +104,7 @@
               </td>
             </tr>
             <tr class="collapse" id="items-<%= order.id %>">
-              <td colspan="8">
+              <td colspan="11">
                 <% if (!order.items || !order.items.length) { %>
                   <div class="text-muted">No items.</div>
                 <% } else { %>
